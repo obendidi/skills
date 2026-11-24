@@ -1,9 +1,9 @@
 ---
-name: deep
-description: Tier 3 empirical research and hard-bug loop. Use when the user says "tier 3", "deep", "debug", "diagnose", or "spike" for novel, complex, or hard-to-reproduce problems.
+name: lab
+description: Tier 3 empirical research and hard-bug loop. Use when the user says "tier 3", "lab", "debug", "diagnose", or "spike" for novel, complex, or hard-to-reproduce problems.
 ---
 
-# Deep (Tier 3)
+# Lab (Tier 3)
 
 Falsification-driven loop for uncharted problems, hard bugs, and performance regressions. Runs beat opinions: never theorize or debate what a fast experiment can measure.
 

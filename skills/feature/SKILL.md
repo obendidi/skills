@@ -1,9 +1,9 @@
 ---
-name: design
-description: Tier 2 workflow for involved features, refactors, or multi-service/high-impact changes. Use when the user says "tier 2" or "design", or in Plan mode.
+name: feature
+description: Tier 2 workflow for involved features, refactors, or multi-service/high-impact changes. Use when the user says "tier 2" or "feature", or in Plan mode.
 ---
 
-# Design (Tier 2)
+# Feature (Tier 2)
 
 For refactors, multi-service work, contract/schema changes, or features where getting the shape right matters before writing code. Stay read-only until the plan is approved.
 

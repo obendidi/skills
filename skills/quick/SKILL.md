@@ -15,4 +15,4 @@ Default loop for small, localized edits where the shape is already clear.
 
 ## Escalating
 
-If scope surprises you (contract or schema change, multi-service blast radius, or an unverified root cause), suggest stepping up to `design` (Tier 2) or `deep` (Tier 3) in one line — never switch silently.
+If scope surprises you (contract or schema change, multi-service blast radius, or an unverified root cause), suggest stepping up to `feature` (Tier 2) or `lab` (Tier 3) in one line — never switch silently.
