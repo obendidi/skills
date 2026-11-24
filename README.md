@@ -1,6 +1,16 @@
 # skills
 
-A 3-tier operating loop and companion review/PR skills for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
+[![skills.sh](https://img.shields.io/badge/skills.sh-obendidi%2Fskills-0f172a?logo=vercel)](https://skills.sh/obendidi/skills)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A lightweight 3-tier operating loop (`quick`, `feature`, `lab`) plus `council` and `pr` skills for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
+
+## Why this
+
+Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). This pack is ~215 lines total across 5 focused skills built around two ideas:
+
+- **Match ceremony to risk**: small fixes run with zero planning overhead (`quick`), multi-file changes gate on a ≤40-line plan (`feature`), and hard bugs require a runnable harness plus isolated worktree experiments before touching `main` (`lab`).
+- **Multi-provider when available, standalone everywhere**: `lab` and `council` fan out across providers in T3 Code, and explicitly fall back to fresh read-only subagents or local `git worktree` runs in single-provider CLIs.
 
 ## Install
 
@@ -56,6 +66,17 @@ Match the workflow to the problem size. Suggest stepping up a tier in one line i
 
 - **T3 Code / multi-provider setups**: `lab` and `council` fan out across available providers (e.g. Claude, Codex, Antigravity) using isolated worktrees and read-only delegates.
 - **Single-provider CLIs (Claude Code, Codex CLI, OpenCode, Antigravity)**: `lab` runs isolated experiments via subagent worktrees or local `git worktree` checkouts, and `council` explicitly falls back to fresh, read-only subagents (or a cold-read diff review if subagents are unavailable) so every skill works standalone.
+
+## Example: `lab` on a real regression
+
+When [`obendidi/trackflow`](https://github.com/obendidi/trackflow) trailed Roboflow `trackers` 2.7.0 on MOT17 with YOLO26 Nano (`29.9` vs `32.9` HOTA), running `lab` forced a runnable evaluation harness first, then compared preprocessing hypotheses in isolated worktrees against the same-day control ([trackflow#117](https://github.com/obendidi/trackflow/pull/117)):
+
+| # | Hypothesis | Change | MOT17 val HOTA (control: 29.9) | Verdict |
+| :-: | :--- | :--- | ---: | :--- |
+| 1 | Stretched 1920×1080 frames distort YOLO26 boxes | Letterbox to 640×640 with gray (114) padding | **37.4** (+7.5, beats `trackers` 32.9) | Promote |
+| 2 | Apply same letterbox to default RT-DETRv2 R18 | Letterbox RT-DETRv2 inputs | 45.2 vs 45.1 (MOTA −1.2) | Discard |
+
+Instead of debating preprocessing or changing every detector globally, the loop isolated the fix to the five YOLO26 presets, verified web-playground parity, and left DETR models untouched.
 
 ## License & Credits
 
