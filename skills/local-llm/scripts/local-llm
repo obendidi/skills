@@ -1,0 +1,219 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "openai>=1.0",
+#   "httpx>=0.27",
+# ]
+# ///
+"""Self-contained uv CLI for calling a local Ollama / OpenAI-compatible LLM (text, vision, JSON)."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import mimetypes
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+import httpx
+from openai import APIStatusError, OpenAI
+
+DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+if not DEFAULT_HOST.startswith(("http://", "https://")):
+    DEFAULT_HOST = f"http://{DEFAULT_HOST}"
+
+FENCE_RE = re.compile(r"^```(?:json)?\s*\n(.*?)\n```\s*$", re.S | re.I)
+
+
+def make_client(host: str, timeout: float) -> OpenAI:
+    base_url = host if host.endswith("/v1") else f"{host}/v1"
+    return OpenAI(
+        base_url=base_url,
+        api_key=os.environ.get("LOCAL_LLM_API_KEY", "ollama"),
+        timeout=timeout,
+    )
+
+
+def list_models(client: OpenAI) -> list[str]:
+    return [m.id for m in client.models.list().data]
+
+
+def resolve_model(client: OpenAI, requested: str | None) -> str:
+    if requested:
+        return requested
+    if env_model := os.environ.get("LOCAL_LLM_MODEL", "").strip():
+        return env_model
+    models = list_models(client)
+    if not models:
+        raise RuntimeError("No models available on local server. Run `ollama pull <model>` first.")
+    return models[0]
+
+
+def run_check(host: str) -> int:
+    try:
+        models = list_models(make_client(host, timeout=5.0))
+    except Exception as exc:
+        print(f"UNAVAILABLE: Cannot reach {host} ({exc})", file=sys.stderr)
+        return 2
+
+    print(f"OK: Local LLM server reachable at {host}")
+    print(f"Installed models ({len(models)}): {', '.join(models) if models else '(none)'}")
+
+    try:
+        ps = httpx.get(f"{host.removesuffix('/v1')}/api/ps", timeout=5.0).json()
+        loaded = [str(m.get("name", "")) for m in ps.get("models", []) if isinstance(m, dict)]
+        print(f"Currently loaded ({len(loaded)}): {', '.join(loaded) if loaded else '(none — idle)'}")
+    except Exception:
+        pass
+    return 0
+
+
+def load_schema(schema_arg: str) -> dict[str, Any]:
+    path = Path(schema_arg)
+    raw = path.read_text(encoding="utf-8") if path.is_file() else schema_arg
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("--schema must be a JSON Schema object")
+    return data
+
+
+def image_to_data_url(image_path: str) -> str:
+    path = Path(image_path).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+    mime = mimetypes.guess_type(path.name)[0] or "image/png"
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+def build_messages(system: str | None, user_text: str, images: list[str]) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    if images:
+        parts: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
+        parts.extend({"type": "image_url", "image_url": {"url": url}} for url in images)
+        messages.append({"role": "user", "content": parts})
+    else:
+        messages.append({"role": "user", "content": user_text})
+    return messages
+
+
+def parse_json_output(text: str) -> Any:
+    cleaned = text.strip()
+    if match := FENCE_RE.match(cleaned):
+        cleaned = match.group(1).strip()
+    return json.loads(cleaned)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="local-llm",
+        description="Call a local Ollama / OpenAI-compatible LLM (text, vision, JSON).",
+    )
+    p.add_argument("prompt", nargs="*", help="Prompt text (can also be combined with piped stdin).")
+    p.add_argument("--check", action="store_true", help="Check local LLM server availability and models.")
+    p.add_argument("--host", default=DEFAULT_HOST, help=f"Server base URL (default: {DEFAULT_HOST}).")
+    p.add_argument("-m", "--model", help="Model name (defaults to $LOCAL_LLM_MODEL or first installed model).")
+    p.add_argument("-s", "--system", help="Optional system prompt.")
+    p.add_argument("-i", "--image", action="append", default=[], help="Image path for vision input (repeatable).")
+    p.add_argument("--json", action="store_true", help="Request and validate JSON output.")
+    p.add_argument("--schema", help="Path to a JSON Schema file (or inline JSON) for structured output.")
+    think_group = p.add_mutually_exclusive_group()
+    think_group.add_argument("--think", dest="think", action="store_true", default=None, help="Enable thinking mode.")
+    think_group.add_argument("--no-think", dest="think", action="store_false", help="Disable thinking mode (faster).")
+    p.add_argument("--num-ctx", type=int, help="Override Ollama context window size (e.g. 32768).")
+    p.add_argument("--temperature", type=float, help="Sampling temperature (e.g. 0.0 for deterministic extraction).")
+    p.add_argument("--timeout", type=float, default=300.0, help="HTTP timeout in seconds (default: 300).")
+    p.add_argument("--raw", action="store_true", help="Print full raw JSON response.")
+    return p
+
+
+def main(argv: list[str]) -> int:
+    args = build_parser().parse_args(argv)
+    host = args.host.rstrip("/")
+
+    if args.check:
+        return run_check(host)
+
+    stdin_text = sys.stdin.read().strip() if not sys.stdin.isatty() else ""
+    prompt_text = " ".join(args.prompt).strip()
+    if not prompt_text and not stdin_text:
+        print("ERROR: Provide a prompt argument or pipe input via stdin (or run --check).", file=sys.stderr)
+        return 1
+
+    user_text = f"{prompt_text}\n\n---\n{stdin_text}" if (prompt_text and stdin_text) else (prompt_text or stdin_text)
+    want_json = bool(args.json or args.schema)
+
+    try:
+        client = make_client(host, timeout=args.timeout)
+        model = resolve_model(client, args.model)
+        image_urls = [image_to_data_url(p) for p in args.image]
+        schema_obj = load_schema(args.schema) if args.schema else None
+
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": build_messages(args.system, user_text, image_urls),
+        }
+        if args.temperature is not None:
+            kwargs["temperature"] = args.temperature
+        if schema_obj is not None:
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "strict": True, "schema": schema_obj},
+            }
+        elif args.json:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        extra_body: dict[str, Any] = {}
+        if args.think is not None:
+            extra_body["think"] = args.think
+        if args.num_ctx is not None:
+            extra_body["options"] = {"num_ctx": args.num_ctx}
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+
+        try:
+            resp = client.chat.completions.create(**kwargs)
+        except APIStatusError as exc:
+            # Ollama's MLX runner can return 501 for grammar-constrained response_format;
+            # fall back to prompt-enforced JSON + strict validation.
+            if exc.status_code == 501 and want_json and "response_format" in kwargs:
+                kwargs.pop("response_format", None)
+                json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
+                if schema_obj is not None:
+                    json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
+                fallback_system = f"{args.system}\n\n{json_rule}" if args.system else json_rule
+                kwargs["messages"] = build_messages(fallback_system, user_text, image_urls)
+                resp = client.chat.completions.create(**kwargs)
+            else:
+                raise
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    if args.raw:
+        print(resp.model_dump_json(indent=2))
+        return 0
+
+    content = (resp.choices[0].message.content or "") if resp.choices else ""
+    if want_json:
+        try:
+            parsed = parse_json_output(content)
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: Model output was not valid JSON ({exc}):\n{content}", file=sys.stderr)
+            return 1
+        print(json.dumps(parsed, ensure_ascii=False))
+        return 0
+
+    print(content)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

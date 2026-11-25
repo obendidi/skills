@@ -3,11 +3,11 @@
 [![skills.sh](https://img.shields.io/badge/skills.sh-obendidi%2Fskills-0f172a?logo=vercel)](https://skills.sh/obendidi/skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A lightweight 3-tier operating loop (`quick`, `feature`, `lab`) plus `council` and `pr` skills for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
+A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `council` and `pr` workflow skills, and focused specialist skills (`local-llm`, `onnx-vision-deploy`, `plain-writing`) for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
 
 ## Why this
 
-Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). This pack is ~215 lines total across 5 focused skills built around two ideas:
+Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). The core 5-skill loop is ~215 lines total, built around two ideas:
 
 - **Match ceremony to risk**: small fixes run with zero planning overhead (`quick`), multi-file changes gate on a ≤40-line plan (`feature`), and hard bugs require a runnable harness plus isolated worktree experiments before touching `main` (`lab`).
 - **Multi-provider when available, standalone everywhere**: `lab` and `council` fan out across providers in T3 Code, and explicitly fall back to fresh read-only subagents or local `git worktree` runs in single-provider CLIs.
@@ -24,10 +24,11 @@ npx skills add obendidi/skills -g -a claude-code -a codex -a antigravity -a open
 
 *(Pass `-a antigravity` explicitly if you use Antigravity — the CLI's auto-detector checks `~/.gemini/antigravity` rather than `~/.gemini/config/skills`.)*
 
-**Interactive or project-local install**:
+**Interactive or single-skill install**:
 
 ```bash
 npx skills add obendidi/skills
+npx skills add obendidi/skills --skill lab --skill council
 ```
 
 **Update installed skills later**:
@@ -45,6 +46,14 @@ npx skills update
 | [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `debug`, `diagnose`, `spike` | Runnable harness first → isolated worktree experiments → independent verification → clean promotion |
 | [`council`](skills/council/SKILL.md) | Review / critique | `council`, `council of 2`, `cheap council` | Independent multi-provider review (with explicit single-provider subagent fallback) |
 | [`pr`](skills/pr/SKILL.md) | Pull requests | file, open, comment on, monitor, or babysit a PR | Clean PR descriptions, agent-attributed GitHub comments, and scope-disciplined babysitting |
+
+### Specialist skills
+
+| Skill | Domain | What it does |
+| :--- | :--- | :--- |
+| [`local-llm`](skills/local-llm/SKILL.md) | Local Ollama / OpenAI-compatible CLI | Bundled zero-setup `uv` script for private OCR/vision, bulk classification, and strict JSON extraction (with MLX HTTP-501 structured-output fallback) |
+| [`onnx-vision-deploy`](skills/onnx-vision-deploy/SKILL.md) | ONNX computer vision | Checklist for CPU/CUDA/Apple Silicon CoreML (`MLProgram` vs `NeuralNetwork`) and WebGPU parity, letterboxing vs stretching, and pinned weights |
+| [`plain-writing`](skills/plain-writing/SKILL.md) | Technical prose | Conclusion-first PRs, RFCs, READMEs, and release notes with concrete numbers and AI-filler cuts |
 
 ## Recommended `AGENTS.md` Router (for Tier 1 by default)
 
