@@ -19,7 +19,7 @@ Requires Node.js 22.20+ (via [`skills`](https://github.com/vercel-labs/skills)).
 **Global install across providers** (recommended):
 
 ```bash
-npx skills add obendidi/skills -g -a claude-code -a codex -a antigravity -a opencode
+npx skills add obendidi/skills -g -a claude-code -a codex -a antigravity -a cursor -a opencode
 ```
 
 *(Pass `-a antigravity` explicitly if you use Antigravity — the CLI's auto-detector checks `~/.gemini/antigravity` rather than `~/.gemini/config/skills`.)*
@@ -28,7 +28,7 @@ npx skills add obendidi/skills -g -a claude-code -a codex -a antigravity -a open
 
 ```bash
 npx skills add obendidi/skills
-npx skills add obendidi/skills --skill lab --skill council
+npx skills add obendidi/skills --skill lab --skill council --skill review
 ```
 
 **Update installed skills later**:
@@ -75,7 +75,7 @@ Match the workflow to the problem size. Suggest stepping up a tier in one line i
 ## Multi-provider vs. Single-provider Harnesses
 
 - **T3 Code / multi-provider setups**: `lab` and `council` fan out across available providers (e.g. Claude, Codex, Antigravity) using isolated worktrees and read-only delegates.
-- **Single-provider CLIs (Claude Code, Codex CLI, OpenCode, Antigravity)**: `lab` runs isolated experiments via subagent worktrees or local `git worktree` checkouts, and `council` explicitly falls back to fresh, read-only subagents (or a cold-read diff review if subagents are unavailable) so every skill works standalone.
+- **Single-provider CLIs (Claude Code, Codex CLI, Cursor, OpenCode, Antigravity)**: `lab` runs isolated experiments via subagent worktrees or local `git worktree` checkouts, and `council` explicitly falls back to fresh, read-only subagents (or a cold-read diff review if subagents are unavailable) so every skill works standalone.
 
 ## Example: `lab` on a real regression
 

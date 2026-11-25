@@ -16,28 +16,28 @@ Run fast, zero-cost, private local inference through Ollama (or any OpenAI-compa
 - **Do NOT use for**:
   - Interactive coding, multi-file refactoring, or long-context reasoning (>32k tokens) — use your primary coding model instead.
 
-## Step 1: Check Availability
+## Step 1: Resolve Script Path & Check Availability
 
-Before relying on a local model, resolve `scripts/local-llm` relative to this `SKILL.md` directory and run:
+Resolve `LOCAL_LLM="<skill-dir>/scripts/local-llm"` from this `SKILL.md`'s directory so commands work from any project directory, then run:
 
 ```bash
-./scripts/local-llm --check
+"$LOCAL_LLM" --check
 ```
 
-Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first installed model on the server.
+Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first local non-embedding chat model (`*embed*` and `*-cloud` tags are skipped automatically so private files never route to cloud models unless `--allow-cloud` is passed). Requires `uv` and localhost access — inside restricted sandboxes (e.g. Codex, Cursor), retry with network/escalated permission before declaring Ollama unavailable.
 
 ## Common Usage
 
 ### Text prompt or piped stdin
 
 ```bash
-./scripts/local-llm --no-think "Classify this note into work, personal, or finance" < note.txt
+"$LOCAL_LLM" --no-think "Classify this note into work, personal, or finance" < note.txt
 ```
 
 ### Deterministic JSON extraction
 
 ```bash
-cat email.txt | ./scripts/local-llm \
+cat email.txt | "$LOCAL_LLM" \
   --no-think --temperature 0 --json \
   --system "Return JSON with keys: category, urgency (low|med|high), summary." \
   "Triage this email"
@@ -46,7 +46,7 @@ cat email.txt | ./scripts/local-llm \
 ### Strict JSON Schema + local vision OCR
 
 ```bash
-./scripts/local-llm \
+"$LOCAL_LLM" \
   --model qwen2.5vl \
   --no-think --temperature 0 \
   --schema '{"type":"object","properties":{"vendor":{"type":"string"},"total":{"type":"number"}},"required":["vendor","total"]}' \
@@ -57,14 +57,15 @@ cat email.txt | ./scripts/local-llm \
 ### Plain image transcription
 
 ```bash
-./scripts/local-llm --model qwen2.5vl --image /path/to/screenshot.png "Transcribe all visible text verbatim."
+"$LOCAL_LLM" --model qwen2.5vl --image /path/to/screenshot.png "Transcribe all visible text verbatim."
 ```
 
 ## Key Flags & Behavior
 
-- `--no-think` / `--think`: disable thinking for fast classification/extraction, or enable it for harder prompts.
-- `-m, --model <name>`: override model (e.g., `qwen2.5vl`, `gemma3`, `llama3.2-vision`, or set `LOCAL_LLM_MODEL`).
-- `--num-ctx <int>`: override Ollama context window size.
-- `--raw`: print the full OpenAI-compatible JSON response (including usage and timing fields).
-- `OLLAMA_HOST` / `--host`: override server URL (default `http://127.0.0.1:11434`; works with LM Studio, vLLM, or llama.cpp `/v1` servers too).
-- **MLX structured-output fallback**: Ollama's MLX runner can return HTTP 501 for grammar-constrained `response_format`; `--json` and `--schema` automatically retry with prompt-enforced JSON and validate stdout with `json.loads` so output is still guaranteed valid JSON.
+- `--no-think` / `--think`: maps to `reasoning_effort` (`none` / `medium`) on `/v1` and `think` on Ollama `/api/chat`.
+- `-m, --model <name>`: override model (`LOCAL_LLM_MODEL` env also supported; pass `--allow-cloud` only when intentionally targeting a `*-cloud` tag).
+- `--stdin`: force reading piped stdin alongside `--image` (by default `--image` calls leave stdin untouched so `while read` batch loops work cleanly).
+- `--num-ctx <int>`: override Ollama context window via native `/api/chat` (errors explicitly on non-Ollama `/v1` servers).
+- `--raw`: print the full JSON API response (including usage and timing fields).
+- `OLLAMA_HOST` / `--host`: override server URL (normalizes bare `127.0.0.1:11434` and `0.0.0.0`; works with LM Studio, vLLM, or llama.cpp `/v1` servers).
+- **Structured-output fallback & validation**: retries HTTP `400`/`422`/`501` `response_format` rejections (such as Ollama MLX `501` or vLLM/LM Studio schema limits) with prompt-enforced JSON, rejects non-finite `NaN`/`Infinity`, and validates `type`, `required`, `properties`, `items`, and `enum` against `--schema`.

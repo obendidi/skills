@@ -13,7 +13,7 @@ Never treat "session loaded and returned boxes" as proof that an execution provi
 
 - Run at least **5 real non-trivial frames** (different aspect ratios, crowded scenes) on both `CPUExecutionProvider` and the target EP.
 - Compare **detection count**, **matched-box IoU** (target `>= 0.90` on matched pairs), and **max confidence delta** (or cosine similarity `>= 0.99` for embedding models like OSNet/CLIP).
-- Fail loudly when a requested `--device` is unavailable — never silently fall back to CPU and claim GPU acceleration.
+- Fail loudly when a requested `--device` is unavailable, and verify operator placement / wall-clock latency (via profiling or verbose EP logs) so silent per-operator CPU fallback is never claimed as GPU acceleration.
 
 ## 2. Match Training Preprocessing — Do Not Blindly Trust Configs
 

@@ -24,7 +24,7 @@ Before fanning out or spending compute, state in ≤8 lines:
 
 Build or name **one fast, runnable command** (failing test, replay script, curl, benchmark, profiler, or telemetry query) and run it on the control before generating hypotheses:
 - **Red-capable & calibrated**: fails on the exact symptom or prints `METRIC=<value>` deterministically. For flakes, raise repro rate with stress/loops first; for noisy timing/ML benchmarks, run 2–3× on control to record the noise floor (`±δ`) and require candidates to beat control beyond `±δ`.
-- **Minimised & locked**: strip unrelated inputs/steps until every remaining piece is load-bearing. Workers may never edit tests, fixtures, tolerances, or the eval harness itself.
+- **Minimised, shared & locked**: strip unrelated inputs/steps until every remaining piece is load-bearing. Commit any new test/fixture on a working branch as the control SHA (or put external replay scripts in shared scratch storage by absolute path) so clean worktrees have it; workers may never edit tests, fixtures, tolerances, or the eval harness.
 - **Redacted**: scrub secrets (`<REDACTED>`) before showing commands or outputs.
 - **No harness, no theories**: if you cannot build a runnable signal, stop, list what you tried, and ask the user for traces, fixtures, or access.
 
@@ -33,13 +33,13 @@ Build or name **one fast, runnable command** (failing test, replay script, curl,
 Generate **3–5 falsifiable hypotheses** (`If X, changing Y produces Z`). Show the ranked list to the user (don't block if they are AFK or in Deep mode).
 
 Isolate each experiment from the committed control (or current frontier commit in Deep mode):
-- **Multi-provider / worktree harnesses** (e.g. T3 Code `orchestrator_capabilities` + `delegate_task` with `isolation: "worktree"`, picking 1 top flagship per distinct model family at `high` effort — escalating to `xhigh` on stalls — and rotating or spilling over onto peer top-tier flagships when a provider hits quota; or Claude Code `Agent` with `isolation: "worktree"`): assign each delegate a **distinct hypothesis or failure mode** (never 3 copies of the same generic prompt).
+- **Multi-provider / worktree harnesses** (e.g. T3 Code `orchestrator_capabilities` + `delegate_task` with `isolation: "worktree"`, selecting seats per [`council` § Seats](../council/SKILL.md) at `high` effort; or Claude Code `Agent` with `isolation: "worktree"`): assign each delegate a **distinct hypothesis or failure mode** (never 3 copies of the same generic prompt).
 - **Single-provider fallback**: state single-provider mode explicitly and test distinct hypotheses via fresh subagent worktrees or sequential `git worktree` checkouts from the same base SHA.
 - Pass the exact eval command and require a ≤15-line reply: hypothesis, commit/diff summary (`+added/-removed`), command run, raw output/numbers, and lesson learned.
 
 ## 4. Verify & cross-examine
 
-- **Never trust self-reported numbers**: the coordinator re-runs the winning candidate's exact command against the control baseline and verifies tests/fixtures/harness were untouched.
+- **Never trust self-reported numbers**: the coordinator re-runs viable candidates' exact command in ranked order against the control baseline and verifies tests/fixtures/harness were untouched.
 - **Simplicity tie-breaker**: discard complex special-case diffs that only move the metric within `±δ`; prefer code-deleting simplifications at equal metric.
 - **Adversarial cross-check**: run [`review`](../review/SKILL.md) (or a fresh read-only subagent / [`council`](../council/SKILL.md) seat from a different provider than the winner) checking for benchmark-overfitted hotfixes, reward hacking, and broken callers.
 - **Kill losers fast**: cancel or discard branches that miss the threshold or stall (e.g. `task_cancel` in T3 Code).

@@ -13,28 +13,30 @@ Long-horizon extension of [`lab`](../SKILL.md) for open-ended optimization, algo
 
 ## 2. Worktree-Safe State (`$LAB_DIR`)
 
-Uncommitted files inside a main checkout are invisible to `isolation: "worktree"` children and dirty `git status`. Store run state inside Git's shared common directory (outside every working tree, readable from every local worktree):
+Uncommitted files inside a main checkout are invisible to `isolation: "worktree"` children and dirty `git status`. Store run state inside Git's shared common directory when writable, falling back to `mktemp -d` in sandboxes (e.g. Codex workspace-write) that write-protect `.git/`:
 
 ```bash
-LAB_DIR="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo /tmp)/lab/<slug>"
-mkdir -p "$LAB_DIR"
+COMMON_GIT="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir 2>/dev/null || true)"
+LAB_DIR="${COMMON_GIT:+$(cd "$COMMON_GIT" && pwd)/lab/<slug>}"
+if [[ -z "$LAB_DIR" ]] || ! mkdir -p "$LAB_DIR" 2>/dev/null; then
+  LAB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/lab-<slug>-XXXXXX")"
+fi
 ```
 
 **Coordinator-only writes** (read-only sandboxes cannot write files, and parallel workers race on appends — delegates return text; only the coordinator writes `$LAB_DIR`):
-- `brief.md`: decision, target metric & direction (or `open` + `reference_ceiling`), control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers`.
-- `eval.sh`: executable script (`chmod +x`) that runs against `$PWD` (never `$(dirname "$0")`), prints `METRIC=<number>` plus guardrail status, and exits non-zero on broken tests/invariants. Record `EVAL_SHA="$(shasum -a 256 "$LAB_DIR/eval.sh" | awk '{print $1}')"` before Round 1.
+- `brief.md`: decision, target metric & direction (or `open` + `reference_ceiling`), control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers` (`<provider>@round`).
+- `eval.sh`: executable script (`chmod +x`) that runs against `$PWD` (never `$(dirname "$0")`), prints `METRIC=<number>` plus guardrail status, and exits non-zero on broken tests/invariants. Record `EVAL_SHA="$((sha256sum "$LAB_DIR/eval.sh" 2>/dev/null || shasum -a 256 "$LAB_DIR/eval.sh") | awk '{print $1}')"` and assert `[[ ${#EVAL_SHA} -eq 64 ]]` before Round 1.
 - `literature.md`: synthesized prior art, citations, codebase bottlenecks, and dead ends.
 - `ledger.tsv`: append-only log (`round`, `seat`, `hypothesis`, `commit`, `diff_stat`, `metric`, `delta_vs_best`, `verdict`, `lesson`).
-- **Mid-run resume**: If `$LAB_DIR/brief.md` and `$LAB_DIR/ledger.tsv` already exist (e.g. after switching the parent thread's provider/model on a quota hit), read them plus `literature.md` and resume directly from `lab/<slug>` `HEAD` at the next unfinished round instead of repeating Gate 0 or Phase 0.
+- **Mid-run resume**: If `$LAB_DIR/brief.md` and `$LAB_DIR/ledger.tsv` already exist (e.g. after switching the parent thread's provider/model on a quota hit), reconcile `lab/<slug>` `HEAD` to the last `KEEP` SHA recorded in `ledger.tsv` (or control SHA if none), read `literature.md`, and resume at the next unfinished round without repeating Gate 0 or Phase 0.
 
 ## 3. Seats, Effort Pacing & Quota Failover
 
-- **Distinct families & peer flagships (T3 Code)**: Call `orchestrator_capabilities` once. Pick **1 top-generation flagship per distinct model family** across available providers first (do not pick the same model family on two providers when native families are available, and never pad seats with older or fast/mini tiers). When a provider offers multiple **peer top-tier flagships** (same latest generation and max-effort capability), **rotate peer variants across rounds** so both get exercised, and use a second peer flagship to **fill seats vacated by a quota-limited provider**.
+- **Seats & peer-flagship rotation**: Select seats per [`council` § Seats](../../council/SKILL.md) (1 top-generation flagship per distinct model family first; never pad with older or fast/mini tiers). When a provider exposes multiple **peer top-tier flagships**, **rotate peer variants across rounds** so both get exercised, and use a second peer flagship to fill quota-vacated seats.
 - **Progressive effort escalation (pace quota, save big guns for stalls)**:
-  - **Cruise (Phase 0 & normal rounds)**: Run delegates at **`high` effort with nested orchestration off** (e.g. Claude `effort: "high"` with `ultracode: false`; Codex `reasoningEffort: "high"`; Antigravity `thought_level: "high"`). Each worker already owns one narrow angle/hypothesis and must not spawn subagents.
-  - **Big guns (Stalls only)**: Escalate to **`xhigh`** (or Claude `effort: "medium"`/`"high"` + `ultracode: true` for a single deep-dive seat) **only** on the automated stall-breaker (Section 6) and the round immediately following a plateau. Use `max` / `ultra` / `ultrathink` only when explicitly requested by the user.
-- **Quota / rate-limit failover (`3 → 2 → 1`)**: If the user explicitly pinned a provider/model, report quota/capacity errors and do not silently substitute. Otherwise, when a delegate fails on quota, usage cap, or `429`, record that provider under `cooled_down_providers` in `brief.md` so later rounds skip it, log a 1-line note in `ledger.tsv`, and immediately re-dispatch its hypothesis to a healthy provider or peer top-tier flagship (degrading `3 → 2 → 1` providers without stopping; pause only if all providers are exhausted).
-- **Single-provider fallback (Claude Code, Codex CLI, Antigravity, OpenCode, Cursor)**: State single-provider mode explicitly. Use fresh subagents (no shared conversation bias) with **disjoint research lenses** in Phase 0 and **isolated worktrees** (`isolation: "worktree"` or `git worktree add`) in Phase 1..N.
+  - **Cruise (Phase 0 & normal rounds)**: Run child delegates at **`high` effort with nested orchestration off** (e.g. Claude `effort: "high"`, `ultracode: false`; Codex `reasoningEffort: "high"`; Antigravity `thought_level: "high"`).
+  - **Big guns (Stalls only)**: Escalate child delegates to **`xhigh` effort** (still keeping `ultracode: false` on all child seats so they never spawn nested subagents) **only** on the automated stall-breaker (Section 6) and the round immediately following a plateau. Reserve `max` / `ultra` / `ultrathink` for explicit user requests.
+- **Quota / rate-limit failover (`3 → 2 → 1`)**: Unless the user pinned a specific provider/model, on quota/`429` failure record `<provider>@<round>` in `cooled_down_providers` (retry after 2 rounds for transient rate limits; skip permanently on hard cap exhaustion), log a 1-line note in `ledger.tsv`, and re-dispatch the hypothesis to a healthy provider or peer flagship (`3 → 2 → 1`; pause only if all providers are exhausted).
 - **Network routing**: Assign web/paper searches only to delegates with network access (e.g. Antigravity's built-in `research` subagent is offline — route external angles to cross-provider or network-enabled subagents, and give offline subagents local codebase/profiler angles).
 
 ## 4. Phase 0 — Literature, Prior Art & Bottleneck Survey (Read-Only)
@@ -59,8 +61,8 @@ Synthesize replies into `$LAB_DIR/literature.md`, record an empirical `reference
 
 ## 5. Phase 1..N — Evolutionary Worktree Loop (`lab/<slug>`)
 
-Create working branch `lab/<slug>` from the control SHA (leaving the user's branch untouched until Clean Promotion).
-- **Frontier rule**: `isolation: "worktree"` branches from the coordinator's **current committed `HEAD`**. Whenever a verified candidate wins, commit/cherry-pick it onto `lab/<slug>` *before* launching Round `k+1` so new worktrees evolve from the new best state.
+Require `git status --porcelain` to be empty before creating/switching to working branch `lab/<slug>` from the control SHA (or run the coordinator in its own dedicated worktree so user WIP is never touched).
+- **Frontier rule**: `isolation: "worktree"` branches from the coordinator's **current committed `HEAD`**. Whenever a verified candidate wins, advance `lab/<slug>` *before* launching Round `k+1` so new worktrees evolve from the new best state.
 
 Each round, launch **2–3 parallel worktree delegates** on **distinct hypotheses**:
 
@@ -69,19 +71,19 @@ Isolated experiment in your own worktree. Do not push, switch branches, or start
 Read first: <LAB_DIR>/brief.md, <LAB_DIR>/literature.md, <LAB_DIR>/ledger.tsv
 Assigned hypothesis: <If X, changing Y produces Z>
 Do NOT repeat DISCARDed ideas in ledger.tsv or modify tests, fixtures, tolerances, or <LAB_DIR>/eval.sh.
-Run `<LAB_DIR>/eval.sh` from your worktree root ($PWD). Iterate locally up to 4 edit->eval cycles to debug wiring or tune one variable cleanly. Strip any `[DEBUG-...]` logs and `git commit` your best clean state locally.
+Run `<LAB_DIR>/eval.sh` from your worktree root ($PWD). Iterate locally up to 4 edit->eval cycles to debug wiring or tune one variable cleanly. Strip any `[DEBUG-...]` logs and `git commit` your best clean state locally (if sandbox rules block `git commit`, leave clean edits in place and report `WORKTREE: <abs path>`).
 Reply in <=15 lines:
 HYPOTHESIS: <1 line>
-COMMIT: <sha or NONE> | DIFF_STAT: <+added/-removed>
+COMMIT: <sha or WORKTREE:<abs path> or NONE> | DIFF_STAT: <+added/-removed>
 RAW_EVAL: <exact METRIC and guardrail output>
 LESSON: <what caused the delta or why it failed>
 ```
 
 **Coordinator verification & selection each round**:
-1. Confirm `shasum -a 256 "$LAB_DIR/eval.sh"` still equals `EVAL_SHA` and inspect `git show --stat <commit>` (auto-`DISCARD` any test, fixture, tolerance, or harness edit).
-2. Apply/checkout the top candidate on `lab/<slug>` and **re-run `"$LAB_DIR/eval.sh"` yourself**.
-3. **Selection (`KEEP` vs `DISCARD`)**: `KEEP` on `lab/<slug>` only if all guardrails pass and the metric beats the current frontier **beyond `±δ`** — or matches within `±δ` while **deleting net code**. Otherwise `git reset --hard` `lab/<slug>` to the prior frontier commit (`DISCARD`).
-4. Append all candidates (with `LESSON`) to `$LAB_DIR/ledger.tsv` and cancel stalled tasks (`task_cancel` in T3 Code).
+1. Re-compute `CURRENT_SHA="$((sha256sum "$LAB_DIR/eval.sh" 2>/dev/null || shasum -a 256 "$LAB_DIR/eval.sh") | awk '{print $1}')"` and assert `[[ ${#CURRENT_SHA} -eq 64 && "$CURRENT_SHA" == "$EVAL_SHA" ]]`.
+2. Test viable candidates **in ranked order** inside a disposable detached worktree (`VERIFY_WT="$(mktemp -d)" && git worktree add --detach "$VERIFY_WT" <commit>`, or copy/apply from `WORKTREE:<path>` when uncommitted): inspect `git -C "$VERIFY_WT" diff --stat <frontier_sha>` (auto-`DISCARD` any test, fixture, tolerance, or harness edit) and **re-run `"$LAB_DIR/eval.sh"` from `"$VERIFY_WT"` yourself** until one qualifies or all fail; remove `"$VERIFY_WT"` (`git worktree remove --force "$VERIFY_WT"`).
+3. **Selection (`KEEP` vs `DISCARD`)**: `KEEP` only if all guardrails pass and the metric beats the current frontier **beyond `±δ`** — or matches within `±δ` while **deleting net code**. Advance `lab/<slug>` (`git merge --ff-only <commit>` or `git cherry-pick <commit>`) **only after** a candidate qualifies (never run `git reset --hard` on a shared checkout).
+4. Append all candidates (with `LESSON`) to `$LAB_DIR/ledger.tsv` before starting the next round, and cancel stalled tasks (`task_cancel` in T3 Code).
 
 ## 6. Diminishing Returns, Stall-Breaker & Open-Ended Early Exit
 
@@ -105,7 +107,7 @@ Reply in <=20 lines: BOTTLENECK, 3 NEW HYPOTHESES, or CEILING_REACHED (with prof
 Before promoting `lab/<slug>` to a clean branch (Step 6 of [`SKILL.md`](../SKILL.md)):
 1. Re-run the **full un-minimised test/benchmark/holdout suite** against the same-day control baseline.
 2. Run [`review`](../../review/SKILL.md) — or a 2-seat [`council`](../../council/SKILL.md) excluding the winning provider — targeting **benchmark-overfitted hotfixes, reward hacking, and bloat**.
-3. Re-implement the minimal winning diff on the target branch with a regression test, delete `lab/<slug>`, throwaway worktrees, and `$LAB_DIR`, and report the `ledger.tsv` summary.
+3. Report the `ledger.tsv` summary and verified control-vs-winner metrics first, then re-implement the minimal winning diff on the target branch with a regression test and clean up throwaway worktrees (`lab/<slug>` and `$LAB_DIR` once confirmed).
 
 ## 8. Host Tips for Unattended Multi-Hour Runs
 

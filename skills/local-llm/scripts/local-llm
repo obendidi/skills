@@ -16,18 +16,42 @@ import json
 import mimetypes
 import os
 import re
+import select
+import stat
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from openai import APIStatusError, OpenAI
 
-DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
-if not DEFAULT_HOST.startswith(("http://", "https://")):
-    DEFAULT_HOST = f"http://{DEFAULT_HOST}"
-
 FENCE_RE = re.compile(r"^```(?:json)?\s*\n(.*?)\n```\s*$", re.S | re.I)
+
+
+def normalize_host(raw: str | None) -> str:
+    val = (raw or "").strip().rstrip("/")
+    if not val:
+        return "http://127.0.0.1:11434"
+    has_scheme = val.startswith(("http://", "https://"))
+    if not has_scheme:
+        val = f"http://{val}"
+    parts = urlsplit(val)
+    hostname = parts.hostname or "127.0.0.1"
+    if hostname in ("0.0.0.0", "::"):
+        hostname = "127.0.0.1"
+    port = parts.port
+    if port is None and parts.scheme == "http" and not parts.path and (not has_scheme or raw.strip() in ("http://0.0.0.0", "http://127.0.0.1", "http://localhost")):
+        port = 11434
+    host_fmt = f"[{hostname}]" if ":" in hostname else hostname
+    netloc = f"{host_fmt}:{port}" if port is not None else host_fmt
+    if parts.username:
+        auth = f"{parts.username}:{parts.password}@" if parts.password else f"{parts.username}@"
+        netloc = auth + netloc
+    return urlunsplit((parts.scheme, netloc, parts.path.rstrip("/"), "", ""))
+
+
+DEFAULT_HOST = normalize_host(os.environ.get("OLLAMA_HOST"))
 
 
 def make_client(host: str, timeout: float) -> OpenAI:
@@ -43,15 +67,32 @@ def list_models(client: OpenAI) -> list[str]:
     return [m.id for m in client.models.list().data]
 
 
-def resolve_model(client: OpenAI, requested: str | None) -> str:
-    if requested:
-        return requested
-    if env_model := os.environ.get("LOCAL_LLM_MODEL", "").strip():
-        return env_model
+def is_cloud_model(model_id: str) -> bool:
+    low = model_id.lower()
+    return low.endswith("-cloud") or ":cloud" in low
+
+
+def is_embedding_model(model_id: str) -> bool:
+    return "embed" in model_id.lower()
+
+
+def resolve_model(client: OpenAI, requested: str | None, *, allow_cloud: bool = False) -> str:
+    chosen = (requested or os.environ.get("LOCAL_LLM_MODEL", "")).strip()
+    if chosen:
+        if is_cloud_model(chosen) and not allow_cloud:
+            raise RuntimeError(
+                f"Refusing cloud-proxied model '{chosen}' by default to protect private inputs; pass --allow-cloud if intentional."
+            )
+        return chosen
     models = list_models(client)
     if not models:
         raise RuntimeError("No models available on local server. Run `ollama pull <model>` first.")
-    return models[0]
+    local_chat = [m for m in models if not is_embedding_model(m) and (allow_cloud or not is_cloud_model(m))]
+    if not local_chat:
+        raise RuntimeError(
+            "No local chat model available (skipped embedding and *-cloud tags). Pull a local model or pass -m <model>."
+        )
+    return local_chat[0]
 
 
 def run_check(host: str) -> int:
@@ -74,41 +115,168 @@ def run_check(host: str) -> int:
 
 
 def load_schema(schema_arg: str) -> dict[str, Any]:
-    path = Path(schema_arg)
+    path = Path(schema_arg).expanduser()
     raw = path.read_text(encoding="utf-8") if path.is_file() else schema_arg
-    data = json.loads(raw)
+    data = json.loads(raw, parse_constant=_reject_nonfinite)
     if not isinstance(data, dict):
         raise ValueError("--schema must be a JSON Schema object")
     return data
 
 
-def image_to_data_url(image_path: str) -> str:
+def read_image_b64(image_path: str) -> tuple[str, str]:
     path = Path(image_path).expanduser()
     if not path.is_file():
         raise FileNotFoundError(f"Image file not found: {image_path}")
     mime = mimetypes.guess_type(path.name)[0] or "image/png"
     b64 = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{b64}"
+    return mime, b64
 
 
-def build_messages(system: str | None, user_text: str, images: list[str]) -> list[dict[str, Any]]:
+def build_v1_messages(system: str | None, user_text: str, images: list[tuple[str, str]]) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if system:
         messages.append({"role": "system", "content": system})
     if images:
         parts: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
-        parts.extend({"type": "image_url", "image_url": {"url": url}} for url in images)
+        parts.extend({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}} for mime, b64 in images)
         messages.append({"role": "user", "content": parts})
     else:
         messages.append({"role": "user", "content": user_text})
     return messages
 
 
-def parse_json_output(text: str) -> Any:
+def _reject_nonfinite(token: str) -> Any:
+    raise ValueError(f"Non-finite constant '{token}' is not valid JSON")
+
+
+def _matches_json_type(val: Any, expected: str) -> bool:
+    if expected == "object":
+        return isinstance(val, dict)
+    if expected == "array":
+        return isinstance(val, list)
+    if expected == "string":
+        return isinstance(val, str)
+    if expected == "boolean":
+        return isinstance(val, bool)
+    if expected == "integer":
+        return isinstance(val, int) and not isinstance(val, bool)
+    if expected == "number":
+        return isinstance(val, (int, float)) and not isinstance(val, bool)
+    if expected == "null":
+        return val is None
+    return True
+
+
+def validate_against_schema(val: Any, schema: dict[str, Any], path: str = "$") -> None:
+    expected_type = schema.get("type")
+    if isinstance(expected_type, str):
+        if not _matches_json_type(val, expected_type):
+            raise ValueError(f"{path}: expected {expected_type}, got {type(val).__name__}")
+    elif isinstance(expected_type, list):
+        if not any(_matches_json_type(val, t) for t in expected_type if isinstance(t, str)):
+            raise ValueError(f"{path}: expected one of {expected_type}, got {type(val).__name__}")
+
+    if "enum" in schema and val not in schema["enum"]:
+        raise ValueError(f"{path}: value {val!r} not in enum {schema['enum']}")
+
+    if isinstance(val, dict):
+        for req_key in schema.get("required", []):
+            if req_key not in val:
+                raise ValueError(f"{path}: missing required key '{req_key}'")
+        props = schema.get("properties")
+        if isinstance(props, dict):
+            for k, subschema in props.items():
+                if k in val and isinstance(subschema, dict):
+                    validate_against_schema(val[k], subschema, f"{path}.{k}")
+    elif isinstance(val, list) and isinstance(schema.get("items"), dict):
+        for idx, item in enumerate(val):
+            validate_against_schema(item, schema["items"], f"{path}[{idx}]")
+
+
+def parse_json_output(text: str, schema_obj: dict[str, Any] | None = None) -> Any:
     cleaned = text.strip()
     if match := FENCE_RE.match(cleaned):
         cleaned = match.group(1).strip()
-    return json.loads(cleaned)
+    parsed = json.loads(cleaned, parse_constant=_reject_nonfinite)
+    if schema_obj is not None:
+        validate_against_schema(parsed, schema_obj)
+    return parsed
+
+
+def read_stdin_safely(*, force_stdin: bool, has_prompt: bool, has_images: bool) -> str:
+    if force_stdin:
+        return sys.stdin.read().strip()
+    if sys.stdin.isatty():
+        return ""
+    if not has_prompt:
+        return sys.stdin.read().strip()
+    if has_images:
+        # Preserve outer `while read f; do local-llm --image "$f" ...; done < list.txt` loops unless --stdin is set.
+        return ""
+    try:
+        mode = os.fstat(sys.stdin.fileno()).st_mode
+        if stat.S_ISREG(mode):
+            return sys.stdin.read().strip()
+        if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+            ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+            return sys.stdin.read().strip() if ready else ""
+    except Exception:
+        return ""
+    return ""
+
+
+def call_ollama_native_chat(
+    host: str,
+    *,
+    model: str,
+    system: str | None,
+    user_text: str,
+    images: list[tuple[str, str]],
+    temperature: float | None,
+    think: bool | None,
+    num_ctx: int,
+    want_json: bool,
+    schema_obj: dict[str, Any] | None,
+    timeout: float,
+) -> tuple[str, dict[str, Any]]:
+    base = host.removesuffix("/v1")
+    msgs: list[dict[str, Any]] = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    user_msg: dict[str, Any] = {"role": "user", "content": user_text}
+    if images:
+        user_msg["images"] = [b64 for _, b64 in images]
+    msgs.append(user_msg)
+
+    options: dict[str, Any] = {"num_ctx": num_ctx}
+    if temperature is not None:
+        options["temperature"] = temperature
+
+    payload: dict[str, Any] = {"model": model, "messages": msgs, "stream": False, "options": options}
+    if think is not None:
+        payload["think"] = think
+    if schema_obj is not None:
+        payload["format"] = schema_obj
+    elif want_json:
+        payload["format"] = "json"
+
+    resp = httpx.post(f"{base}/api/chat", json=payload, timeout=timeout)
+    if resp.status_code == 404:
+        raise RuntimeError(
+            f"--num-ctx requires Ollama's native /api/chat endpoint (got 404 from {base}/api/chat). Configure context size on the server instead."
+        )
+    if resp.status_code in (400, 422, 501) and want_json and "format" in payload:
+        payload.pop("format", None)
+        json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
+        if schema_obj is not None:
+            json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
+        fallback_sys = f"{system}\n\n{json_rule}" if system else json_rule
+        payload["messages"] = [{"role": "system", "content": fallback_sys}, user_msg]
+        resp = httpx.post(f"{base}/api/chat", json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    content = str((data.get("message") or {}).get("content") or "")
+    return content, data
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -116,18 +284,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="local-llm",
         description="Call a local Ollama / OpenAI-compatible LLM (text, vision, JSON).",
     )
-    p.add_argument("prompt", nargs="*", help="Prompt text (can also be combined with piped stdin).")
+    p.add_argument("prompt", nargs="*", help="Prompt text (use '-' or --stdin to force reading piped stdin).")
     p.add_argument("--check", action="store_true", help="Check local LLM server availability and models.")
     p.add_argument("--host", default=DEFAULT_HOST, help=f"Server base URL (default: {DEFAULT_HOST}).")
-    p.add_argument("-m", "--model", help="Model name (defaults to $LOCAL_LLM_MODEL or first installed model).")
+    p.add_argument("-m", "--model", help="Model name (defaults to $LOCAL_LLM_MODEL or first local chat model).")
+    p.add_argument("--allow-cloud", action="store_true", help="Allow cloud-proxied model tags (e.g. *-cloud).")
     p.add_argument("-s", "--system", help="Optional system prompt.")
     p.add_argument("-i", "--image", action="append", default=[], help="Image path for vision input (repeatable).")
+    p.add_argument("--stdin", action="store_true", help="Explicitly read piped stdin (useful alongside --image).")
     p.add_argument("--json", action="store_true", help="Request and validate JSON output.")
     p.add_argument("--schema", help="Path to a JSON Schema file (or inline JSON) for structured output.")
     think_group = p.add_mutually_exclusive_group()
     think_group.add_argument("--think", dest="think", action="store_true", default=None, help="Enable thinking mode.")
     think_group.add_argument("--no-think", dest="think", action="store_false", help="Disable thinking mode (faster).")
-    p.add_argument("--num-ctx", type=int, help="Override Ollama context window size (e.g. 32768).")
+    p.add_argument("--num-ctx", type=int, help="Override Ollama context window size via /api/chat (e.g. 32768).")
     p.add_argument("--temperature", type=float, help="Sampling temperature (e.g. 0.0 for deterministic extraction).")
     p.add_argument("--timeout", type=float, default=300.0, help="HTTP timeout in seconds (default: 300).")
     p.add_argument("--raw", action="store_true", help="Print full raw JSON response.")
@@ -136,13 +306,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
-    host = args.host.rstrip("/")
+    host = normalize_host(args.host)
 
     if args.check:
         return run_check(host)
 
-    stdin_text = sys.stdin.read().strip() if not sys.stdin.isatty() else ""
-    prompt_text = " ".join(args.prompt).strip()
+    dash_stdin = args.prompt == ["-"]
+    prompt_parts = [] if dash_stdin else args.prompt
+    prompt_text = " ".join(prompt_parts).strip()
+    stdin_text = read_stdin_safely(
+        force_stdin=bool(args.stdin or dash_stdin),
+        has_prompt=bool(prompt_text),
+        has_images=bool(args.image),
+    )
     if not prompt_text and not stdin_text:
         print("ERROR: Provide a prompt argument or pipe input via stdin (or run --check).", file=sys.stderr)
         return 1
@@ -152,63 +328,85 @@ def main(argv: list[str]) -> int:
 
     try:
         client = make_client(host, timeout=args.timeout)
-        model = resolve_model(client, args.model)
-        image_urls = [image_to_data_url(p) for p in args.image]
+        model = resolve_model(client, args.model, allow_cloud=args.allow_cloud)
+        images = [read_image_b64(p) for p in args.image]
         schema_obj = load_schema(args.schema) if args.schema else None
 
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": build_messages(args.system, user_text, image_urls),
-        }
-        if args.temperature is not None:
-            kwargs["temperature"] = args.temperature
-        if schema_obj is not None:
-            kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {"name": "response", "strict": True, "schema": schema_obj},
-            }
-        elif args.json:
-            kwargs["response_format"] = {"type": "json_object"}
-
-        extra_body: dict[str, Any] = {}
-        if args.think is not None:
-            extra_body["think"] = args.think
         if args.num_ctx is not None:
-            extra_body["options"] = {"num_ctx": args.num_ctx}
-        if extra_body:
-            kwargs["extra_body"] = extra_body
+            content, raw_payload = call_ollama_native_chat(
+                host,
+                model=model,
+                system=args.system,
+                user_text=user_text,
+                images=images,
+                temperature=args.temperature,
+                think=args.think,
+                num_ctx=args.num_ctx,
+                want_json=want_json,
+                schema_obj=schema_obj,
+                timeout=args.timeout,
+            )
+            if args.raw:
+                print(json.dumps(raw_payload, indent=2, ensure_ascii=False, allow_nan=False))
+                return 0
+        else:
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": build_v1_messages(args.system, user_text, images),
+            }
+            if args.temperature is not None:
+                kwargs["temperature"] = args.temperature
+            if args.think is not None:
+                kwargs["reasoning_effort"] = "medium" if args.think else "none"
+            if schema_obj is not None:
+                kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "response", "strict": True, "schema": schema_obj},
+                }
+            elif args.json:
+                kwargs["response_format"] = {"type": "json_object"}
 
-        try:
-            resp = client.chat.completions.create(**kwargs)
-        except APIStatusError as exc:
-            # Ollama's MLX runner can return 501 for grammar-constrained response_format;
-            # fall back to prompt-enforced JSON + strict validation.
-            if exc.status_code == 501 and want_json and "response_format" in kwargs:
-                kwargs.pop("response_format", None)
-                json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
-                if schema_obj is not None:
-                    json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
-                fallback_system = f"{args.system}\n\n{json_rule}" if args.system else json_rule
-                kwargs["messages"] = build_messages(fallback_system, user_text, image_urls)
+            try:
                 resp = client.chat.completions.create(**kwargs)
-            else:
-                raise
+            except APIStatusError as exc:
+                # Retry if server rejects reasoning_effort or grammar-constrained response_format (e.g. Ollama MLX 501, vLLM/LM Studio 400/422).
+                if exc.status_code in (400, 422, 501) and ("reasoning_effort" in kwargs or (want_json and "response_format" in kwargs)):
+                    if want_json and "response_format" in kwargs:
+                        kwargs.pop("response_format", None)
+                        json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
+                        if schema_obj is not None:
+                            json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
+                        fallback_system = f"{args.system}\n\n{json_rule}" if args.system else json_rule
+                        kwargs["messages"] = build_v1_messages(fallback_system, user_text, images)
+                    else:
+                        kwargs.pop("reasoning_effort", None)
+                    try:
+                        resp = client.chat.completions.create(**kwargs)
+                    except APIStatusError as exc2:
+                        if exc2.status_code in (400, 422) and "reasoning_effort" in kwargs:
+                            kwargs.pop("reasoning_effort", None)
+                            resp = client.chat.completions.create(**kwargs)
+                        else:
+                            raise
+                else:
+                    raise
+
+            if args.raw:
+                print(resp.model_dump_json(indent=2))
+                return 0
+            content = (resp.choices[0].message.content or "") if resp.choices else ""
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    if args.raw:
-        print(resp.model_dump_json(indent=2))
-        return 0
-
-    content = (resp.choices[0].message.content or "") if resp.choices else ""
     if want_json:
         try:
-            parsed = parse_json_output(content)
-        except json.JSONDecodeError as exc:
-            print(f"ERROR: Model output was not valid JSON ({exc}):\n{content}", file=sys.stderr)
+            parsed = parse_json_output(content, schema_obj=schema_obj)
+            out = json.dumps(parsed, ensure_ascii=False, allow_nan=False)
+        except (json.JSONDecodeError, ValueError) as exc:
+            print(f"ERROR: Model output failed JSON validation ({exc}):\n{content}", file=sys.stderr)
             return 1
-        print(json.dumps(parsed, ensure_ascii=False))
+        print(out)
         return 0
 
     print(content)

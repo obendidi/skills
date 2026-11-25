@@ -16,7 +16,7 @@ Read the affected modules, callers, contracts, tests, and repo conventions befor
 Only ask what materially changes what gets built:
 - Batch at most 5 numbered questions per round, each with your recommended default.
 - Never drip questions one at a time.
-- If the user says "just build" or skips alignment, state your key assumptions in ≤3 bullets and drop to Tier 1 (`quick`).
+- If the codebase already answers everything, proceed straight to Step 3 (Plan + Approval gate) — silence is never a skip. Only when the user explicitly says "just build", state your key assumptions in ≤3 bullets and jump to Step 5 (retaining slice verification, drift stop, and final `review`).
 
 ## 3. Plan (≤40 lines in chat)
 

@@ -12,7 +12,7 @@ Turn verbose or AI-sounding technical text into direct, verifiable prose that en
 1. **Conclusion first**: open with the verdict, problem, or user-visible outcome in one sentence. End with the next step or open decision. Never open a PR or doc with a file-by-file inventory.
 2. **Concrete over vague**: name the exact module, metric, baseline, and sample size. Replace "significantly faster" with `78 ms -> 35 ms on 120 MOT17-09 frames`.
 3. **Separate evidence from opinion**: keep observed facts, proposals, accepted decisions, and verified results distinct. State what went unchecked or is `unknown` instead of smoothing over gaps.
-4. **Describe what it does now**: code comments, READMEs, and docs describe current behavior. Conversation history, rejected attempts, and rationale belong in commit messages or PR descriptions — not in code or docs.
+4. **Describe what it does now**: code comments, READMEs, and reference docs describe current behavior — keep conversation history out of durable docs, and put implementation history in commit/PR messages. Exception: RFCs and architecture decision records (ADRs) *must* preserve decision rationale, tradeoffs, and rejected alternatives.
 5. **Match scope to the reader**:
    - **Changelogs**: user-visible outcomes only (no internal refactors unless behavior changed).
    - **Launch posts / READMEs**: state real limits and non-goals upfront — credibility comes from saying when *not* to use the tool.

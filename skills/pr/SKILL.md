@@ -13,7 +13,7 @@ In T3 Code, use the `pull_request_*`, `ci_*`, and `watch_pull_request` tools; el
 - Follow repo title conventions (check recent merged PRs). Lead with the user-visible outcome, not implementation mechanics.
 - Open the description with the problem in plain words, then briefly explain the fix — never open with a file-by-file inventory.
 - Check title, body, quotes, and attachments for secrets or private details.
-- Open a non-draft PR so review bots and CI run. Stop there unless asked to babysit.
+- Open a non-draft PR by default (unless a draft was requested) so review bots and CI run. Stop there unless asked to babysit.
 
 ## 2. Commenting on GitHub
 
@@ -32,9 +32,9 @@ Comment body here.
 
 ## 3. Babysitting
 
-- Handle existing checks and comments first. In T3 Code, start `watch_pull_request` and end your turn (`unwatch_pull_request` before handing back or asking a question). Elsewhere, check status via `gh pr checks` / `gh pr view` rather than polling in a sleep loop.
-- Act only on checks and comments newer than the latest push. Verify every bot finding against the source before editing.
-- **Fight scope creep**: fix real bugs in the intended case and real CI failures (distinguish infra flakes). Decline nits, speculative guards, or extra tests with a brief written reason and resolve the thread. Prefer fixes that delete or narrow code.
+- Handle existing checks and unresolved comments first. In T3 Code, start `watch_pull_request` and end your turn (`unwatch_pull_request` before handing back or asking a question). Elsewhere, wait on pending CI with `gh pr checks --watch` (never a manual `sleep` loop) and re-read comments via `gh pr view`.
+- Scope CI checks to the current `HEAD` SHA, and evaluate all **unresolved** review threads against current `HEAD` regardless of when they were posted. Verify every bot finding against the source before editing.
+- **Fight scope creep**: fix real bugs in the intended case and real CI failures (distinguish infra flakes). Decline nits, speculative guards, or extra tests with a brief written reason — auto-resolve advisory bot threads only, and leave human disagreements open for the reviewer. Prefer fixes that delete or narrow code.
 - Treat advisory bots (e.g. CodeRabbit) as feedback only — never hold a merge for them.
-- Check whether the PR is `BEHIND` or `DIRTY` before calling it ready (rebase, push, and re-verify if base commits touched the PR's files).
+- Check whether the PR is `BEHIND` or `DIRTY` before calling it ready. Require a clean working tree; prefer `git merge origin/<base>`, or rebase + `git push --force-with-lease` (never bare `--force`) only on agent-owned branches (abort and ask on conflicts or shared branches), then re-verify if base commits touched the PR's files.
 - Merge only when explicitly asked; otherwise stop and report readiness once required checks and reviews pass.

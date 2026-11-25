@@ -5,14 +5,14 @@ description: Independent multi-provider code review or plan/RFC critique using t
 
 # Council
 
-Independent review by strong models from different providers, applying the [`review`](../review/SKILL.md) rubric across separate seats with a clean fallback when only one provider is available. Fix known issues and run checks first so reviewers audit the real change.
+Independent review by strong models from different providers, applying the [`review`](../review/SKILL.md) rubric across separate seats with a clean fallback when only one provider is available. Stay read-only by default — edit files and run Round 2 re-reviews only when the user asks to fix/iterate.
 
 ## Seats
 
 ### Multi-provider (when available)
 
 - **Default (`council`, up to 3 seats)**: one top-generation flagship per distinct model family across available providers (e.g. Claude, Codex, Antigravity) at `high` reasoning effort (do not duplicate a model family across two providers when distinct families exist, and never pad with lower/older tiers). In T3 Code, resolve models via `orchestrator_capabilities` and launch read-only delegates in parallel via `delegate_task`.
-- **`council of 2`**: two flagship providers, excluding the provider that authored the change.
+- **`council of 2`**: two flagship providers, excluding the provider that authored the change (if only one non-author provider is available, pair it with a fresh split-lens subagent).
 - **`fast council` / `cheap council`**: mid-tier fast models across 2–3 providers for routine PRs when flagship latency/cost is unnecessary.
 - **Unavailable / quota-limited providers**: if the user explicitly named a provider or model, report it instead of substituting. Otherwise, if an unpinned provider fails on quota/`429`, fill its seat with a peer top-tier flagship variant from a healthy provider (or drop cleanly to 2 seats / single-provider fallback, stating the degradation in 1 line).
 
@@ -23,7 +23,7 @@ When only one provider is available (and the user did not request a specific mis
 2. Launch **2 fresh, read-only subagents** (no author conversation history) with **split lenses** — pairing 1 flagship model with 1 faster sibling model when available:
    - **Seat A (flagship)**: deep bugs, security/data safety (input tracing), and design elegance vs. hotfix.
    - **Seat B (fast / second subagent)**: broken callers, spec & value/adoption alignment, scale/tests, and bloat/anti-overengineering.
-3. If the harness has no subagent tool, run one cold-read self-review against `git diff <base>` using the `review` skill rubric.
+3. If the harness has no subagent tool, run one cold-read self-review against `git diff <base>...HEAD` using the `review` skill rubric.
 
 Never edit the checkout while reviewers are reading it.
 
@@ -33,8 +33,8 @@ Never edit the checkout while reviewers are reading it.
 
 ```text
 Review only. Do not edit, commit, push, comment on PRs, or start subagents.
-Repo: <abs path> Base: <sha> Intent: <intent> Out of scope: <scope> Checks: <results>
-See: git diff <base> [-- <paths>]; git status --short (read untracked).
+Repo: <abs path> Base: <merge-base sha> Intent: <intent> Out of scope: <scope> Checks: <results>
+See: git diff <base>...HEAD [-- <paths>]; git status --short (read untracked).
 Apply the `review` skill rubric (read callers/tests; check correctness & spec, value & adoption, high-confidence security after tracing untrusted vs server-controlled input, design elegance vs hotfix, scale/tests, and lean/anti-bloat).
 Skip style unless it hides a bug. Every finding needs a concrete case or cleaner seam.
 blocker = intended case wrong, exploitable security, or data loss. should = real bug, missing spec, ugly hotfix with clear better seam, risky untested code, or bloat. nit = rest.
@@ -60,13 +60,13 @@ C1 [blocker|should|nit] <section> <claim>. Fix: <suggestion>
 
 ## Acting on Findings
 
-Verify every finding against the source yourself; re-classify rare cases or minor costs as nits.
+Verify every finding against the source yourself; re-classify rare cases or minor costs as nits. Report verified findings first; only edit when asked to fix/iterate:
 - **Agree**: make the smallest fix (prefer deleting or simplifying code over adding guards or wrappers).
 - **Disagree**: cite `file:line`, test, or output.
 - **Out of scope / nit**: decline in one line and list as a follow-up.
 
 ## Rounds & Report
 
-- Budget: **2 rounds** (3 only for auth, security, data loss, or concurrency with an open blocker/should). Re-reviews use a fresh reviewer/delegate with the ledger of `fixed:`, `disagree:`, and `declined:` items.
+- Budget: **2 rounds** when iterating on fixes (3 only for auth, security, data loss, or concurrency with an open blocker/should). Re-reviews use a fresh reviewer/delegate with the ledger of `fixed:`, `disagree:`, and `declined:` items.
 - Stop early when a round returns only nits. If disputed after 2 replies or budget ends, present both sides in 2–3 lines for the user to decide.
-- Report a compact score table per round (`no score` if omitted; never invent one) plus fixed items, disagreements, and follow-ups. Add to a PR description only if asked.
+- Report a compact score table per round (`no score` if omitted; never invent one) plus verified findings, disagreements, and follow-ups. Add to a PR description only if asked.
