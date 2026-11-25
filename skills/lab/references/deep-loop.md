@@ -6,9 +6,9 @@ Long-horizon extension of [`lab`](../SKILL.md) for open-ended optimization, algo
 
 - **Coordinator-only parent**: Keep the parent thread clean across 8+ rounds by delegating heavy literature reading, profiling, and edit-test cycles to fresh subagents/delegates. Only compact summaries and ledger rows enter parent context.
 - **Non-Stop Contract**: Once Gate 0 passes and paid compute remains `$0`, **do not pause between rounds to ask "should I continue?"**. Keep looping until:
-  1. Coordinator-verified metric clears the target threshold beyond noise floor `±δ`,
+  1. **Goal or ceiling met**: coordinator-verified metric clears an explicit target threshold beyond `±δ` — or, on open-ended goals (after ≥2 rounds), captures **≥85–90% of the removable gap** to Phase 0's `reference_ceiling`,
   2. Round or wall-clock budget hits (default: **8 rounds**, max **3 delegates/round**),
-  3. Two automated stall-breaker re-frames fail to advance the frontier, or
+  3. Verified `CEILING_REACHED` or the stall/diminishing-returns cap hits (Section 6), or
   4. Paid cloud/GPU spend or a destructive external action requires user approval.
 
 ## 2. Worktree-Safe State (`$LAB_DIR`)
@@ -21,7 +21,7 @@ mkdir -p "$LAB_DIR"
 ```
 
 **Coordinator-only writes** (read-only sandboxes cannot write files, and parallel workers race on appends — delegates return text; only the coordinator writes `$LAB_DIR`):
-- `brief.md`: decision, target metric & direction, control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers`.
+- `brief.md`: decision, target metric & direction (or `open` + `reference_ceiling`), control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers`.
 - `eval.sh`: executable script (`chmod +x`) that runs against `$PWD` (never `$(dirname "$0")`), prints `METRIC=<number>` plus guardrail status, and exits non-zero on broken tests/invariants. Record `EVAL_SHA="$(shasum -a 256 "$LAB_DIR/eval.sh" | awk '{print $1}')"` before Round 1.
 - `literature.md`: synthesized prior art, citations, codebase bottlenecks, and dead ends.
 - `ledger.tsv`: append-only log (`round`, `seat`, `hypothesis`, `commit`, `diff_stat`, `metric`, `delta_vs_best`, `verdict`, `lesson`).
@@ -50,11 +50,12 @@ Repo: <abs path> | Angle: <A, B, or C> | Brief: <LAB_DIR>/brief.md
 Find concrete, falsifiable mechanisms that move METRIC without breaking guardrails. Cite URLs (external) or file:line + profiler numbers (local). Flag dead ends.
 Reply in <=25 lines:
 FINDINGS: 3-5 bullets with citations/measurements
+CEILING: <profiler/Amdahl floor, published SOTA, or oracle upper bound if measurable>
 HYPOTHESES: 2-3 ranked `If X, changing Y produces Z` proposals with expected gain and risk
 DEAD_ENDS: approaches to skip and why
 ```
 
-Synthesize replies into `$LAB_DIR/literature.md` and rank 5–8 falsifiable hypotheses before Round 1.
+Synthesize replies into `$LAB_DIR/literature.md`, record an empirical `reference_ceiling` in `brief.md` when the user gave no fixed target (profiler/I/O floor, published SOTA, or oracle bound), and rank 5–8 falsifiable hypotheses before Round 1.
 
 ## 5. Phase 1..N — Evolutionary Worktree Loop (`lab/<slug>`)
 
@@ -82,18 +83,22 @@ LESSON: <what caused the delta or why it failed>
 3. **Selection (`KEEP` vs `DISCARD`)**: `KEEP` on `lab/<slug>` only if all guardrails pass and the metric beats the current frontier **beyond `±δ`** — or matches within `±δ` while **deleting net code**. Otherwise `git reset --hard` `lab/<slug>` to the prior frontier commit (`DISCARD`).
 4. Append all candidates (with `LESSON`) to `$LAB_DIR/ledger.tsv` and cancel stalled tasks (`task_cancel` in T3 Code).
 
-## 6. Automated Stall-Breaker (After 2 Flat Rounds)
+## 6. Diminishing Returns, Stall-Breaker & Open-Ended Early Exit
 
-If 2 consecutive rounds produce zero `KEEP` commits, launch **1 fresh read-only diagnostic delegate** (prefer a provider that did not author recent attempts):
+- **Minimum 2 rounds on open-ended goals**: Never exit after Round 1 without an explicit user threshold — Round 1 only harvests single-variable wins before testing whether orthogonal wins combine.
+- **Crumbs count as flat**: Once a meaningful `KEEP` win is banked and ≥2 rounds have run, treat any round whose gain is **`< 10%` of cumulative gain so far** as a **flat round** so the loop stops grinding marginal crumbs.
+
+After **2 consecutive flat/crumb rounds**, launch **1 fresh read-only diagnostic delegate** at `xhigh` effort (prefer a provider that did not author recent attempts):
 
 ```text
 Diagnose & re-frame only. Do not edit files or start subagents.
 Read: <LAB_DIR>/brief.md, <LAB_DIR>/literature.md, <LAB_DIR>/ledger.tsv, and `git log -p <control_sha>..HEAD` in <repo>.
 Identify why the last two rounds plateaued (wrong bottleneck, ceiling hit, interaction bug, or variance) and propose 3 orthogonal hypotheses — including combining independent partial wins from earlier rounds.
-Reply in <=20 lines: BOTTLENECK, 3 NEW HYPOTHESES, or CEILING_REACHED (with evidence).
+Reply in <=20 lines: BOTTLENECK, 3 NEW HYPOTHESES, or CEILING_REACHED (with profiler/bound evidence).
 ```
 
-Update `literature.md` and resume. If a second stall-breaker still produces 2 flat rounds, stop and report verified findings.
+- **Immediate ceiling exit**: If the delegate returns `CEILING_REACHED` backed by concrete profiler, bound, or data-ceiling evidence verified by the coordinator, **stop immediately** and proceed to Section 7.
+- **Asymmetric stall cap**: If `lab/<slug>` **already banked a verified win** over control, run **at most 1 stall-breaker + 1 post-stall round** (exit if still flat/crumb). Allow a **2nd stall-breaker** only when still stuck at baseline (`0` wins); if 2 post-stall rounds remain flat, stop and report verified findings.
 
 ## 7. Anti-Overfit Audit & Clean Promotion
 
