@@ -33,7 +33,7 @@ Build or name **one fast, runnable command** (failing test, replay script, curl,
 Generate **3–5 falsifiable hypotheses** (`If X, changing Y produces Z`). Show the ranked list to the user (don't block if they are AFK or in Deep mode).
 
 Isolate each experiment from the committed control (or current frontier commit in Deep mode):
-- **Multi-provider / worktree harnesses** (e.g. T3 Code `orchestrator_capabilities` + `delegate_task` with `isolation: "worktree"`, picking 1 latest flagship per available provider at high/max/ultra reasoning effort; or Claude Code `Agent` with `isolation: "worktree"`): assign each delegate a **distinct hypothesis or failure mode** (never 3 copies of the same generic prompt).
+- **Multi-provider / worktree harnesses** (e.g. T3 Code `orchestrator_capabilities` + `delegate_task` with `isolation: "worktree"`, picking 1 top flagship per distinct model family at `high` effort — escalating to `xhigh` on stalls — and rotating or spilling over onto peer top-tier flagships when a provider hits quota; or Claude Code `Agent` with `isolation: "worktree"`): assign each delegate a **distinct hypothesis or failure mode** (never 3 copies of the same generic prompt).
 - **Single-provider fallback**: state single-provider mode explicitly and test distinct hypotheses via fresh subagent worktrees or sequential `git worktree` checkouts from the same base SHA.
 - Pass the exact eval command and require a ≤15-line reply: hypothesis, commit/diff summary (`+added/-removed`), command run, raw output/numbers, and lesson learned.
 

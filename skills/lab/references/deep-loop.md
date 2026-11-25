@@ -21,14 +21,19 @@ mkdir -p "$LAB_DIR"
 ```
 
 **Coordinator-only writes** (read-only sandboxes cannot write files, and parallel workers race on appends — delegates return text; only the coordinator writes `$LAB_DIR`):
-- `brief.md`: decision, target metric & direction, control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap.
+- `brief.md`: decision, target metric & direction, control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers`.
 - `eval.sh`: executable script (`chmod +x`) that runs against `$PWD` (never `$(dirname "$0")`), prints `METRIC=<number>` plus guardrail status, and exits non-zero on broken tests/invariants. Record `EVAL_SHA="$(shasum -a 256 "$LAB_DIR/eval.sh" | awk '{print $1}')"` before Round 1.
 - `literature.md`: synthesized prior art, citations, codebase bottlenecks, and dead ends.
 - `ledger.tsv`: append-only log (`round`, `seat`, `hypothesis`, `commit`, `diff_stat`, `metric`, `delta_vs_best`, `verdict`, `lesson`).
+- **Mid-run resume**: If `$LAB_DIR/brief.md` and `$LAB_DIR/ledger.tsv` already exist (e.g. after switching the parent thread's provider/model on a quota hit), read them plus `literature.md` and resume directly from `lab/<slug>` `HEAD` at the next unfinished round instead of repeating Gate 0 or Phase 0.
 
-## 3. Seats (Multi-Provider & Single-Provider Fallback)
+## 3. Seats, Effort Pacing & Quota Failover
 
-- **Multi-provider (T3 Code)**: Call `orchestrator_capabilities` once. Pick **1 latest flagship per available provider** (do not pad with weaker models) and enable each provider's deep-reasoning / autonomous options in `target.options` when offered (e.g. `ultracode: true` + `effort: "max"`/`"xhigh"` on Claude, `reasoningEffort: "xhigh"`/`"ultra"` on Codex, `thought_level: "xhigh"` on Antigravity).
+- **Distinct families & peer flagships (T3 Code)**: Call `orchestrator_capabilities` once. Pick **1 top-generation flagship per distinct model family** across available providers first (do not pick the same model family on two providers when native families are available, and never pad seats with older or fast/mini tiers). When a provider offers multiple **peer top-tier flagships** (same latest generation and max-effort capability), **rotate peer variants across rounds** so both get exercised, and use a second peer flagship to **fill seats vacated by a quota-limited provider**.
+- **Progressive effort escalation (pace quota, save big guns for stalls)**:
+  - **Cruise (Phase 0 & normal rounds)**: Run delegates at **`high` effort with nested orchestration off** (e.g. Claude `effort: "high"` with `ultracode: false`; Codex `reasoningEffort: "high"`; Antigravity `thought_level: "high"`). Each worker already owns one narrow angle/hypothesis and must not spawn subagents.
+  - **Big guns (Stalls only)**: Escalate to **`xhigh`** (or Claude `effort: "medium"`/`"high"` + `ultracode: true` for a single deep-dive seat) **only** on the automated stall-breaker (Section 6) and the round immediately following a plateau. Use `max` / `ultra` / `ultrathink` only when explicitly requested by the user.
+- **Quota / rate-limit failover (`3 → 2 → 1`)**: If the user explicitly pinned a provider/model, report quota/capacity errors and do not silently substitute. Otherwise, when a delegate fails on quota, usage cap, or `429`, record that provider under `cooled_down_providers` in `brief.md` so later rounds skip it, log a 1-line note in `ledger.tsv`, and immediately re-dispatch its hypothesis to a healthy provider or peer top-tier flagship (degrading `3 → 2 → 1` providers without stopping; pause only if all providers are exhausted).
 - **Single-provider fallback (Claude Code, Codex CLI, Antigravity, OpenCode, Cursor)**: State single-provider mode explicitly. Use fresh subagents (no shared conversation bias) with **disjoint research lenses** in Phase 0 and **isolated worktrees** (`isolation: "worktree"` or `git worktree add`) in Phase 1..N.
 - **Network routing**: Assign web/paper searches only to delegates with network access (e.g. Antigravity's built-in `research` subagent is offline — route external angles to cross-provider or network-enabled subagents, and give offline subagents local codebase/profiler angles).
 
@@ -99,5 +104,5 @@ Before promoting `lab/<slug>` to a clean branch (Step 6 of [`SKILL.md`](../SKILL
 
 ## 8. Host Tips for Unattended Multi-Hour Runs
 
-- **T3 Code**: Set high/max effort on the coordinator thread (`ultracode: true` + `max` on Claude, `xhigh`/`ultra` on Codex, `/goal` or `xhigh` on Antigravity).
+- **T3 Code**: Pace the coordinator thread at `high` effort (e.g. `effort: "high"` or `medium` + `ultracode: true` on Claude, `high` on Codex, `/goal` or `high` on Antigravity) — avoid `max`/`ultra` on multi-round coordinators so usage limits last the full run. If the coordinator hits a quota cap mid-run, switch the thread's provider/model and say `"resume deep lab"`.
 - **Standalone CLIs**: Pair `"run deep lab on ..."` with your CLI's long-horizon mode (`/goal` in Antigravity/Codex, `ultracode` or `/loop` in Claude Code) for unattended overnight runs.

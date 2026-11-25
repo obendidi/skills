@@ -11,10 +11,10 @@ Independent review by strong models from different providers, applying the [`rev
 
 ### Multi-provider (when available)
 
-- **Default (`council`, up to 3 seats)**: one latest flagship model per available provider (e.g. Claude, Codex, Antigravity) at high reasoning effort. Do not pad beyond 1 flagship per provider with weaker models — extra lower-tier seats add noise and verification cost. In T3 Code, resolve models via `orchestrator_capabilities` and launch read-only delegates in parallel via `delegate_task`.
+- **Default (`council`, up to 3 seats)**: one top-generation flagship per distinct model family across available providers (e.g. Claude, Codex, Antigravity) at `high` reasoning effort (do not duplicate a model family across two providers when distinct families exist, and never pad with lower/older tiers). In T3 Code, resolve models via `orchestrator_capabilities` and launch read-only delegates in parallel via `delegate_task`.
 - **`council of 2`**: two flagship providers, excluding the provider that authored the change.
 - **`fast council` / `cheap council`**: mid-tier fast models across 2–3 providers for routine PRs when flagship latency/cost is unnecessary.
-- If the user explicitly names a provider or model that is unavailable, report it instead of silently substituting.
+- **Unavailable / quota-limited providers**: if the user explicitly named a provider or model, report it instead of substituting. Otherwise, if an unpinned provider fails on quota/`429`, fill its seat with a peer top-tier flagship variant from a healthy provider (or drop cleanly to 2 seats / single-provider fallback, stating the degradation in 1 line).
 
 ### Single-provider fallback
 
