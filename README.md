@@ -7,7 +7,7 @@ A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `review`, `coun
 
 ## Why this
 
-Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). The core 5-skill loop is ~215 lines total, built around two ideas:
+Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). Every workflow `SKILL.md` stays under 75 lines (~290 lines across all 6), built around two ideas:
 
 - **Match ceremony to risk**: small fixes run with zero planning overhead (`quick`), multi-file changes gate on a ≤40-line plan (`feature`), and hard bugs require a runnable harness plus isolated worktree experiments before touching `main` (`lab`).
 - **Multi-provider when available, standalone everywhere**: `lab` and `council` fan out across providers in T3 Code, and explicitly fall back to fresh read-only subagents or local `git worktree` runs in single-provider CLIs.
@@ -43,7 +43,7 @@ npx skills update
 | :--- | :--- | :--- | :--- |
 | [`quick`](skills/quick/SKILL.md) | **Tier 1** — Quick bite | *(default)*, `tier 1`, `quick` | Read callers, smallest complete diff, 1 targeted check, self-review, 1-line risk close |
 | [`feature`](skills/feature/SKILL.md) | **Tier 2** — Involved feature | `tier 2`, `feature`, Plan mode | Read-only recon → align (≤2 rounds) → 1-page plan → approval gate → slice-by-slice build |
-| [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `debug`, `diagnose`, `spike`, regressions | Runnable harness first → isolated worktree experiments → independent verification → clean promotion |
+| [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `deep lab`, `autoresearch`, `debug`, `diagnose`, `spike`, regressions | Runnable harness first → isolated worktree experiments (plus multi-round literature & frontier loop in [`deep lab`](skills/lab/references/deep-loop.md)) → independent verification → clean promotion |
 | [`review`](skills/review/SKILL.md) | Single-pass code review | `review this`, `code review`, `review my PR`, `is this over-engineered` | Correctness & spec, value & adoption, high-confidence security, elegance vs. hotfix, scale/tests, and anti-bloat |
 | [`council`](skills/council/SKILL.md) | Multi-provider review / critique | `council`, `council of 2`, `fast council`, `cheap council` | Independent multi-provider review using the `review` rubric (plus `fast council`, RFC/plan critique, and split-lens single-provider fallback) |
 | [`pr`](skills/pr/SKILL.md) | Pull requests | file, open, comment on, monitor, or babysit a PR | Clean PR descriptions, agent-attributed GitHub comments, and scope-disciplined babysitting |
@@ -69,7 +69,7 @@ Match the workflow to the problem size. Suggest stepping up a tier in one line i
 | :--- | :--- | :--- |
 | **1 — Quick bite** | *(default — no keyword)* | Read callers, make the smallest complete diff (no speculative wrappers/options), run 1 targeted check (add a small test/assert for non-trivial logic), self-review the diff, and close with 1 line on what went unchecked or any risk. |
 | **2 — Involved feature** | `tier 2`, `feature`, or Plan mode | Load the `feature` skill (recon → align → 1-page plan → approval gate → build). |
-| **3 — Lab (research / hard bug)** | `tier 3`, `lab`, `debug`, `diagnose`, `spike` | Load the `lab` skill (runnable harness first → worktree experiments → verified promotion). |
+| **3 — Lab (research / hard bug)** | `tier 3`, `lab`, `deep lab`, `autoresearch`, `debug`, `diagnose`, `spike` | Load the `lab` skill (runnable harness first → worktree experiments or multi-round `deep lab` frontier loop → verified promotion). |
 ```
 
 ## Multi-provider vs. Single-provider Harnesses
