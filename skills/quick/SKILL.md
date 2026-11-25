@@ -1,6 +1,6 @@
 ---
 name: quick
-description: Tier 1 workflow for small, well-scoped tasks and fixes. Use when the user says "tier 1" or "quick", or as the default loop when no larger workflow is needed.
+description: Tier 1 workflow for small, well-scoped tasks and fixes. Use when the user explicitly says "tier 1" or "quick", or when no global AGENTS.md Tier 1 loop is loaded.
 ---
 
 # Quick (Tier 1)

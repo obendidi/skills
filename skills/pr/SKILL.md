@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Open, comment on, or babysit a pull request through CI and review. Use when the user asks to file, open, comment on, monitor, or babysit a PR.
+description: Open, create, comment on, reply to review threads, or babysit a pull request through CI and review. Use when the user asks to file, create, open, comment on, reply to, check status of, watch CI on, or babysit a PR.
 ---
 
 # Pull Requests
@@ -27,7 +27,7 @@ Comment body here.
 ```
 
 - Never add this prefix to PR descriptions, commit messages, or text the user asked to post verbatim.
-- Use the verified public model name (never guess); check for secrets before posting.
+- Use the verified public model name (never guess) and resolve `<user>` from `git config user.name` or the repo's authenticated GitHub handle (`gh api user -q .login`); check for secrets before posting.
 - Lead with the conclusion, cite code/check evidence, skip filler, and verify GitHub returned the comment URL before resolving a thread.
 
 ## 3. Babysitting

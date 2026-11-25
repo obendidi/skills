@@ -1,6 +1,6 @@
 ---
 name: lab
-description: Tier 3 empirical research and hard-bug loop. Use when the user says "tier 3", "lab", "debug", "diagnose", or "spike" for novel, complex, or hard-to-reproduce problems.
+description: Tier 3 empirical research and hard-bug loop. Use when the user says "tier 3", "lab", "debug", "diagnose", or "spike", or when investigating benchmark, performance, or accuracy regressions, flaky tests, or competing technical hypotheses that need a runnable harness and isolated experiments.
 ---
 
 # Lab (Tier 3)

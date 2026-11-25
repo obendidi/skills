@@ -1,6 +1,6 @@
 ---
 name: local-llm
-description: Run local Ollama or OpenAI-compatible CLI tasks for private OCR/vision, bulk classification, and strict JSON extraction at zero API cost. Use when offloading repetitive extraction, triage, or private document/image OCR to a local model; not for interactive coding or >32k reasoning.
+description: Run local Ollama or OpenAI-compatible CLI tasks for private OCR/vision, bulk classification, and strict JSON extraction at zero API cost. Use when offloading repetitive extraction, triage, or private document/receipt/invoice/screenshot OCR to a local model via Ollama or running free batch JSON extraction; not for interactive coding or over 32k context reasoning.
 ---
 
 # Local LLM CLI (`ollama`)

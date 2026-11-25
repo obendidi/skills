@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Tier 2 workflow for involved features, refactors, or multi-service/high-impact changes. Use when the user says "tier 2" or "feature", or in Plan mode.
+description: Tier 2 workflow for involved features, multi-file refactors, schema or API contract changes, or high-impact edits where getting the shape right matters before coding. Use when the user says "tier 2" or "feature", in Plan mode, or when designing a non-trivial feature or refactor before editing.
 ---
 
 # Feature (Tier 2)
@@ -40,6 +40,6 @@ Stop and wait for explicit user approval (or native Plan mode approval) before e
 
 ## 6. Review & ship
 
-- Run a smallest-diff self-review pass on the final diff (cut dead code, unneeded wrappers, and scope creep).
+- Run a read-only `review` pass on the final diff (correctness, elegance vs. hotfix, security, and bloat).
 - For high-impact changes (auth, data, contracts, multi-service), offer a 2-seat `council` review on the final diff.
 - Ship through the `pr` skill only when asked.

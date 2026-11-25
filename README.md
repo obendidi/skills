@@ -3,7 +3,7 @@
 [![skills.sh](https://img.shields.io/badge/skills.sh-obendidi%2Fskills-0f172a?logo=vercel)](https://skills.sh/obendidi/skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `council` and `pr` workflow skills, and focused specialist skills (`local-llm`, `onnx-vision-deploy`, `plain-writing`) for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
+A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `review`, `council`, and `pr` workflow skills, and focused specialist skills (`local-llm`, `onnx-vision-deploy`, `plain-writing`) for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
 
 ## Why this
 
@@ -43,8 +43,9 @@ npx skills update
 | :--- | :--- | :--- | :--- |
 | [`quick`](skills/quick/SKILL.md) | **Tier 1** — Quick bite | *(default)*, `tier 1`, `quick` | Read callers, smallest complete diff, 1 targeted check, self-review, 1-line risk close |
 | [`feature`](skills/feature/SKILL.md) | **Tier 2** — Involved feature | `tier 2`, `feature`, Plan mode | Read-only recon → align (≤2 rounds) → 1-page plan → approval gate → slice-by-slice build |
-| [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `debug`, `diagnose`, `spike` | Runnable harness first → isolated worktree experiments → independent verification → clean promotion |
-| [`council`](skills/council/SKILL.md) | Review / critique | `council`, `council of 2`, `cheap council` | Independent multi-provider review (with explicit single-provider subagent fallback) |
+| [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `debug`, `diagnose`, `spike`, regressions | Runnable harness first → isolated worktree experiments → independent verification → clean promotion |
+| [`review`](skills/review/SKILL.md) | Single-pass code review | `review this`, `code review`, `review my PR`, `is this over-engineered` | Correctness & spec, value & adoption, high-confidence security, elegance vs. hotfix, scale/tests, and anti-bloat |
+| [`council`](skills/council/SKILL.md) | Multi-provider review / critique | `council`, `council of 2`, `fast council`, `cheap council` | Independent multi-provider review using the `review` rubric (plus `fast council`, RFC/plan critique, and split-lens single-provider fallback) |
 | [`pr`](skills/pr/SKILL.md) | Pull requests | file, open, comment on, monitor, or babysit a PR | Clean PR descriptions, agent-attributed GitHub comments, and scope-disciplined babysitting |
 
 ### Specialist skills
