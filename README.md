@@ -3,7 +3,7 @@
 [![skills.sh](https://img.shields.io/badge/skills.sh-obendidi%2Fskills-0f172a?logo=vercel)](https://skills.sh/obendidi/skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `review`, `council`, and `pr` workflow skills, and focused specialist skills (`local-llm`, `onnx-vision-deploy`, `plain-writing`) for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
+A lightweight 3-tier operating loop (`quick`, `feature`, `lab`), `review`, `council`, and `pr` workflow skills, and focused specialist skills (`local-llm`, `ui-workbench`, `plain-writing`) for coding agents (**Claude Code**, **Codex**, **Antigravity**, **OpenCode**, **Cursor**, and **T3 Code**).
 
 ## Why this
 
@@ -53,7 +53,7 @@ npx skills update
 | Skill | Domain | What it does |
 | :--- | :--- | :--- |
 | [`local-llm`](skills/local-llm/SKILL.md) | Local Ollama / OpenAI-compatible CLI | Bundled zero-setup `uv` script for private OCR/vision, bulk classification, and strict JSON extraction (with MLX HTTP-501 structured-output fallback) |
-| [`onnx-vision-deploy`](skills/onnx-vision-deploy/SKILL.md) | ONNX computer vision | Checklist for CPU/CUDA/Apple Silicon CoreML (`MLProgram` vs `NeuralNetwork`) and WebGPU parity, letterboxing vs stretching, and pinned weights |
+| [`ui-workbench`](skills/ui-workbench/SKILL.md) | Web UI & dashboards | Calm workbench-first design system with dual-theme semantic tokens, progressive disclosure, disciplined typography, and visual-audit gates |
 | [`plain-writing`](skills/plain-writing/SKILL.md) | Technical prose | Conclusion-first PRs, RFCs, READMEs, and release notes with concrete numbers and AI-filler cuts |
 
 ## Recommended `AGENTS.md` Router (for Tier 1 by default)
