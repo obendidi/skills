@@ -52,6 +52,19 @@ def normalize_host(raw: str | None) -> str:
 
 
 DEFAULT_HOST = normalize_host(os.environ.get("OLLAMA_HOST"))
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def is_loopback_host(host: str) -> bool:
+    hostname = (urlsplit(host).hostname or "").lower()
+    return hostname in LOOPBACK_HOSTS
+
+
+def ensure_host_allowed(host: str, *, allow_remote: bool) -> None:
+    if not allow_remote and not is_loopback_host(host):
+        raise RuntimeError(
+            f"Refusing non-loopback endpoint '{host}' by default to protect private inputs; pass --allow-remote if intentional."
+        )
 
 
 def make_client(host: str, timeout: float) -> OpenAI:
@@ -289,6 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--host", default=DEFAULT_HOST, help=f"Server base URL (default: {DEFAULT_HOST}).")
     p.add_argument("-m", "--model", help="Model name (defaults to $LOCAL_LLM_MODEL or first local chat model).")
     p.add_argument("--allow-cloud", action="store_true", help="Allow cloud-proxied model tags (e.g. *-cloud).")
+    p.add_argument("--allow-remote", action="store_true", help="Allow non-loopback --host / OLLAMA_HOST endpoints.")
     p.add_argument("-s", "--system", help="Optional system prompt.")
     p.add_argument("-i", "--image", action="append", default=[], help="Image path for vision input (repeatable).")
     p.add_argument("--stdin", action="store_true", help="Explicitly read piped stdin (useful alongside --image).")
@@ -309,6 +323,8 @@ def main(argv: list[str]) -> int:
     host = normalize_host(args.host)
 
     if args.check:
+        if not is_loopback_host(host):
+            print(f"WARN: {host} is a non-loopback endpoint (pass --allow-remote to send inputs there).", file=sys.stderr)
         return run_check(host)
 
     dash_stdin = args.prompt == ["-"]
@@ -327,6 +343,7 @@ def main(argv: list[str]) -> int:
     want_json = bool(args.json or args.schema)
 
     try:
+        ensure_host_allowed(host, allow_remote=bool(args.allow_remote or args.allow_cloud))
         client = make_client(host, timeout=args.timeout)
         model = resolve_model(client, args.model, allow_cloud=args.allow_cloud)
         images = [read_image_b64(p) for p in args.image]

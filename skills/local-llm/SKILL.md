@@ -24,7 +24,7 @@ Resolve `LOCAL_LLM="<skill-dir>/scripts/local-llm"` from this `SKILL.md`'s direc
 "$LOCAL_LLM" --check
 ```
 
-Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first local non-embedding chat model (`*embed*` and `*-cloud` tags are skipped automatically so private files never route to cloud models unless `--allow-cloud` is passed). Requires `uv` and localhost access — inside restricted sandboxes (e.g. Codex, Cursor), retry with network/escalated permission before declaring Ollama unavailable.
+Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first local non-embedding chat model (`*embed*` and `*-cloud` tags are skipped automatically, and non-loopback `OLLAMA_HOST` / `--host` endpoints are refused by default unless `--allow-remote` or `--allow-cloud` is passed so private files never leave localhost silently). Requires `uv` and localhost access — inside restricted sandboxes (e.g. Codex, Cursor), retry with network/escalated permission before declaring Ollama unavailable.
 
 ## Common Usage
 
@@ -67,5 +67,5 @@ cat email.txt | "$LOCAL_LLM" \
 - `--stdin`: force reading piped stdin alongside `--image` (by default `--image` calls leave stdin untouched so `while read` batch loops work cleanly).
 - `--num-ctx <int>`: override Ollama context window via native `/api/chat` (errors explicitly on non-Ollama `/v1` servers).
 - `--raw`: print the full JSON API response (including usage and timing fields).
-- `OLLAMA_HOST` / `--host`: override server URL (normalizes bare `127.0.0.1:11434` and `0.0.0.0`; works with LM Studio, vLLM, or llama.cpp `/v1` servers).
+- `OLLAMA_HOST` / `--host`: override server URL (normalizes bare `127.0.0.1:11434` and `0.0.0.0`; works with LM Studio, vLLM, or llama.cpp `/v1` servers; pass `--allow-remote` when intentionally targeting a non-loopback host).
 - **Structured-output fallback & validation**: retries HTTP `400`/`422`/`501` `response_format` rejections (such as Ollama MLX `501` or vLLM/LM Studio schema limits) with prompt-enforced JSON, rejects non-finite `NaN`/`Infinity`, and validates `type`, `required`, `properties`, `items`, and `enum` against `--schema`.

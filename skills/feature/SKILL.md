@@ -9,11 +9,11 @@ For refactors, multi-service work, contract/schema changes, or features where ge
 
 ## 1. Recon (read-only)
 
-Read the affected modules, callers, contracts, tests, and repo conventions before asking anything. Don't ask questions the codebase already answers.
+Read the affected modules, callers, contracts, tests, and repo conventions before asking anything. Don't ask questions the codebase already answers, and note any existing pattern that looks broken or mismatched rather than assuming it must be copied.
 
 ## 2. Align (max 2 rounds)
 
-Only ask what materially changes what gets built:
+If an `ambition` Reframed Brief or a finished `grill-me` decision summary already exists in this thread, inherit it as Align and go straight to Step 3 (Plan). Otherwise, ask only what materially changes what gets built:
 - Batch at most 5 numbered questions per round, each with your recommended default.
 - Never drip questions one at a time.
 - If the codebase already answers everything, proceed straight to Step 3 (Plan + Approval gate) — silence is never a skip. Only when the user explicitly says "just build", state your key assumptions in ≤3 bullets and jump to Step 5 (retaining slice verification, drift stop, and final `review`).
@@ -22,6 +22,7 @@ Only ask what materially changes what gets built:
 
 Write a concise plan in chat (no committed spec file unless asked):
 - **Goal & non-goals**: what changes and what stays out of scope.
+- **Constraints & invariants**: list the hard limits and invariants that must never break; reuse existing repo abstractions unless one violates an invariant (and name which one).
 - **Surfaces & contracts**: exact files, APIs, schemas, or migrations touched (and owners if cross-team).
 - **Tradeoffs**: 2–3 viable options only when a real choice exists, with your recommendation.
 - **Slices**: ordered implementation steps, each with its concrete verification command.
@@ -31,7 +32,7 @@ Use visual diagrams or inline previews (e.g. T3 `html_render` or Mermaid) when s
 
 ## 4. Approval gate
 
-Stop and wait for explicit user approval (or native Plan mode approval) before editing product code, installing dependencies, or scaffolding.
+Stop and wait for explicit user approval (or native Plan mode approval) before editing product code, installing dependencies, or scaffolding. For high-impact plans (auth, schemas, contracts, multi-service), offer an optional 2-seat `council` plan critique before building.
 
 ## 5. Build & verify
 

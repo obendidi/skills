@@ -1,6 +1,6 @@
 ---
 name: plain-writing
-description: Write clear, understated, concrete technical prose for PRs, RFCs, READMEs, changelogs, launch posts, and engineering updates without AI filler or marketing fluff. Use when drafting or editing technical writing, PR descriptions, docs, or release notes, or when the user asks to "deslop" or tighten text.
+description: Write clear, understated, concrete technical reference prose for PRs, RFCs, READMEs, changelogs, and engineering updates without AI filler or marketing fluff. Use when drafting or editing technical docs, PR descriptions, RFCs, READMEs, or release notes (use editorial-writing for blog/launch articles, and humanizer to polish existing prose).
 ---
 
 # Plain Technical Writing
@@ -15,7 +15,7 @@ Turn verbose or AI-sounding technical text into direct, verifiable prose that en
 4. **Describe what it does now**: code comments, READMEs, and reference docs describe current behavior — keep conversation history out of durable docs, and put implementation history in commit/PR messages. Exception: RFCs and architecture decision records (ADRs) *must* preserve decision rationale, tradeoffs, and rejected alternatives.
 5. **Match scope to the reader**:
    - **Changelogs**: user-visible outcomes only (no internal refactors unless behavior changed).
-   - **Launch posts / READMEs**: state real limits and non-goals upfront — credibility comes from saying when *not* to use the tool.
+   - **READMEs / technical docs**: state real limits, compatibility boundaries, and non-goals plainly so engineers know when the tool fits.
    - **Drafts in the user's name**: match their cadence and keep only the main points.
 
 ## Cut AI Tells on Sight

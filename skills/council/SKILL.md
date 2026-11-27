@@ -5,7 +5,7 @@ description: Independent multi-provider code review or plan/RFC critique using t
 
 # Council
 
-Independent review by strong models from different providers, applying the [`review`](../review/SKILL.md) rubric across separate seats with a clean fallback when only one provider is available. Stay read-only by default — edit files and run Round 2 re-reviews only when the user asks to fix/iterate.
+Independent review by strong models from different providers, applying the `review` skill rubric across separate seats with a clean fallback when only one provider is available. Stay read-only by default — edit files and run Round 2 re-reviews only when the user asks to fix/iterate.
 
 ## Seats
 
@@ -23,7 +23,7 @@ When only one provider is available (and the user did not request a specific mis
 2. Launch **2 fresh, read-only subagents** (no author conversation history) with **split lenses** — pairing 1 flagship model with 1 faster sibling model when available:
    - **Seat A (flagship)**: deep bugs, security/data safety (input tracing), and design elegance vs. hotfix.
    - **Seat B (fast / second subagent)**: broken callers, spec & value/adoption alignment, scale/tests, and bloat/anti-overengineering.
-3. If the harness has no subagent tool, run one cold-read self-review against `git diff <base>...HEAD` using the `review` skill rubric.
+3. If the harness has no subagent tool, run one cold-read self-review against the exact target diff (`git diff HEAD` + untracked files for WIP, or `git diff <base>...<head>` for branches/PRs) using the `review` skill rubric.
 
 Never edit the checkout while reviewers are reading it.
 
@@ -33,8 +33,8 @@ Never edit the checkout while reviewers are reading it.
 
 ```text
 Review only. Do not edit, commit, push, comment on PRs, or start subagents.
-Repo: <abs path> Base: <merge-base sha> Intent: <intent> Out of scope: <scope> Checks: <results>
-See: git diff <base>...HEAD [-- <paths>]; git status --short (read untracked).
+Repo: <abs path> Target: <WIP | base..head SHA | PR #> Intent: <intent> Out of scope: <scope> Checks: <results>
+See: <git diff HEAD + relevant untracked files for WIP, OR git diff <base>...<head> [-- <paths>] for committed branches/PRs>.
 Apply the `review` skill rubric (read callers/tests; check correctness & spec, value & adoption, high-confidence security after tracing untrusted vs server-controlled input, design elegance vs hotfix, scale/tests, and lean/anti-bloat).
 Skip style unless it hides a bug. Every finding needs a concrete case or cleaner seam.
 blocker = intended case wrong, exploitable security, or data loss. should = real bug, missing spec, ugly hotfix with clear better seam, risky untested code, or bloat. nit = rest.
@@ -55,6 +55,7 @@ blocker = flawed premise, unworkable design, or severe risk. should = material g
 Reply:
 SCORE: <n>/10
 VERDICT: APPROVE or REVISE
+SUMMARY: <1 line: overall coherence + biggest strength/weakness>
 C1 [blocker|should|nit] <section> <claim>. Fix: <suggestion>
 ```
 
