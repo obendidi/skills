@@ -42,7 +42,7 @@ npx skills update
 | Skill | Tier / Role | Triggers | What it does |
 | :--- | :--- | :--- | :--- |
 | [`ambition`](skills/ambition/SKILL.md) | **Pre-flight** — Anchored reframe | `ambition`, `more ambitious`, `ambition check`, `goal beyond the goal` | Anchor outcome & constraints first, diagnose Altitude/Depth/Range, let user pick a dial, and lock a sharper brief for `feature`/`lab` |
-| [`quick`](skills/quick/SKILL.md) | **Tier 1** — Quick bite | *(default)*, `tier 1`, `quick` | Read callers, smallest complete diff, 1 targeted check, self-review, 1-line risk close |
+| [`quick`](skills/quick/SKILL.md) | **Tier 1** — Quick bite | *(default)*, `tier 1`, `quick` | Read callers, smallest complete diff, end-to-end local checks, self-review, risk/blocked-gap close |
 | [`feature`](skills/feature/SKILL.md) | **Tier 2** — Involved feature | `tier 2`, `feature`, Plan mode | Read-only recon → align (≤2 rounds) → 1-page plan → approval gate → slice-by-slice build |
 | [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `deep lab`, `autoresearch`, `research loop`, `overnight lab`, `spike` | Runnable harness first → isolated worktree experiments (plus multi-round literature & frontier loop in [`deep lab`](skills/lab/references/deep-loop.md)) → independent verification → clean promotion |
 | [`review`](skills/review/SKILL.md) | Single-pass code review | `review this`, `code review`, `review my PR`, `is this over-engineered` | Correctness & spec, value & adoption, high-confidence security, elegance vs. hotfix, scale/tests, and anti-bloat |
@@ -69,7 +69,7 @@ Match the workflow to the problem size. Suggest stepping up a tier in one line i
 
 | Tier | Trigger | Workflow |
 | :--- | :--- | :--- |
-| **1 — Quick bite** | *(default — no keyword)* | Read callers, make the smallest complete diff (no speculative wrappers/options), run 1 targeted check (add a small test/assert for non-trivial logic), self-review the diff, and close with 1 line on what went unchecked or any risk. |
+| **1 — Quick bite** | *(default — no keyword)* | Read callers, make the smallest complete diff (no speculative wrappers/options), run every cheap local check needed to verify end-to-end behavior (add a small test/assert for non-trivial logic), self-review the diff, and note remaining risk or unchecked gaps only when genuinely blocked, slow, paid, or external. |
 | **2 — Involved feature** | `tier 2`, `feature`, or Plan mode | Load the `feature` skill (recon → align → 1-page plan → approval gate → build). |
 | **3 — Lab (research / hard bug)** | `tier 3`, `lab`, `deep lab`, `autoresearch`, `research loop`, `overnight lab`, `spike` (or `debug`/`diagnose` when the root cause stays unclear after a quick check) | Load the `lab` skill (runnable harness first → multi-provider worktree experiments or `deep lab` frontier loop → verified promotion). |
 ```

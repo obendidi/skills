@@ -13,7 +13,7 @@ In T3 Code, use the `pull_request_*`, `ci_*`, and `watch_pull_request` tools; el
 - Follow repo title conventions (check recent merged PRs). Lead with the user-visible outcome, not implementation mechanics.
 - Open the description with the problem in plain words, then briefly explain the fix — never open with a file-by-file inventory.
 - Check title, body, quotes, and attachments for secrets or private details.
-- Open a non-draft PR by default (unless a draft was requested) so review bots and CI run. Stop there unless asked to babysit.
+- Open a non-draft PR by default (unless a draft was requested) so review bots and CI run, then automatically move to §3 Babysitting (skip babysitting only for draft PRs or when told "open and stop").
 
 ## 2. Commenting on GitHub
 

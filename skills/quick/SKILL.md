@@ -9,9 +9,9 @@ Default loop for small, localized edits where the shape is already clear.
 
 1. **Read callers first**: inspect the target code, its callers, and nearby tests before editing.
 2. **Smallest complete diff**: fix the root cause with no speculative wrappers, options, or unrelated cleanup.
-3. **Verify**: run one targeted check (add a small test or assert for non-trivial logic).
+3. **Verify**: run every cheap local check needed to confirm end-to-end behavior (add a small test or assert for non-trivial logic) — don't stop after a partial check and punt an easy probe to the user.
 4. **Self-review**: re-read your diff and cut dead code, extra guards, or scope creep.
-5. **Close cleanly**: end with one line stating what went unchecked or any remaining risk.
+5. **Close cleanly**: note remaining risk or unchecked gaps only when a check is genuinely blocked, slow, paid, or external.
 
 ## Escalating
 
