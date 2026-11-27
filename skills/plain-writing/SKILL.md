@@ -30,7 +30,7 @@ Delete or rewrite these patterns before returning any draft:
 
 ## Quick Self-Check Pass
 
-Before finishing any technical doc, PR, or post:
+Before finishing any technical doc, PR, RFC, or changelog:
 - Can the first paragraph be cut without losing the main point? If yes, cut it.
 - Does every claim have a concrete subject, action, or number?
 - Are caveats and unmeasured pieces stated plainly instead of hidden?

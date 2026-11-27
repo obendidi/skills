@@ -13,7 +13,7 @@ Read the affected modules, callers, contracts, tests, and repo conventions befor
 
 ## 2. Align (max 2 rounds)
 
-If an `ambition` Reframed Brief or a finished `grill-me` decision summary already exists in this thread, inherit it as Align and go straight to Step 3 (Plan). Otherwise, ask only what materially changes what gets built:
+If an `ambition` Reframed Brief or confirmed decisions from a finished `grill-me` session exist in this thread, inherit them and skip every question they already resolve (proceeding straight to Step 3 if no material design branches remain). Otherwise, ask only what materially changes what gets built:
 - Batch at most 5 numbered questions per round, each with your recommended default.
 - Never drip questions one at a time.
 - If the codebase already answers everything, proceed straight to Step 3 (Plan + Approval gate) — silence is never a skip. Only when the user explicitly says "just build", state your key assumptions in ≤3 bullets and jump to Step 5 (retaining slice verification, drift stop, and final `review`).

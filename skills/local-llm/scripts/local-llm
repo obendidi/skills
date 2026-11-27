@@ -67,12 +67,21 @@ def ensure_host_allowed(host: str, *, allow_remote: bool) -> None:
         )
 
 
-def make_client(host: str, timeout: float) -> OpenAI:
+def make_http_client(*, timeout: float, allow_remote: bool) -> httpx.Client:
+    return httpx.Client(
+        timeout=timeout,
+        trust_env=allow_remote,
+        follow_redirects=allow_remote,
+    )
+
+
+def make_client(host: str, timeout: float, *, allow_remote: bool = False) -> OpenAI:
     base_url = host if host.endswith("/v1") else f"{host}/v1"
     return OpenAI(
         base_url=base_url,
         api_key=os.environ.get("LOCAL_LLM_API_KEY", "ollama"),
         timeout=timeout,
+        http_client=make_http_client(timeout=timeout, allow_remote=allow_remote),
     )
 
 
@@ -108,9 +117,10 @@ def resolve_model(client: OpenAI, requested: str | None, *, allow_cloud: bool = 
     return local_chat[0]
 
 
-def run_check(host: str) -> int:
+def run_check(host: str, *, allow_remote: bool = False) -> int:
     try:
-        models = list_models(make_client(host, timeout=5.0))
+        ensure_host_allowed(host, allow_remote=allow_remote)
+        models = list_models(make_client(host, timeout=5.0, allow_remote=allow_remote))
     except Exception as exc:
         print(f"UNAVAILABLE: Cannot reach {host} ({exc})", file=sys.stderr)
         return 2
@@ -119,7 +129,8 @@ def run_check(host: str) -> int:
     print(f"Installed models ({len(models)}): {', '.join(models) if models else '(none)'}")
 
     try:
-        ps = httpx.get(f"{host.removesuffix('/v1')}/api/ps", timeout=5.0).json()
+        with make_http_client(timeout=5.0, allow_remote=allow_remote) as http:
+            ps = http.get(f"{host.removesuffix('/v1')}/api/ps").json()
         loaded = [str(m.get("name", "")) for m in ps.get("models", []) if isinstance(m, dict)]
         print(f"Currently loaded ({len(loaded)}): {', '.join(loaded) if loaded else '(none — idle)'}")
     except Exception:
@@ -251,6 +262,7 @@ def call_ollama_native_chat(
     want_json: bool,
     schema_obj: dict[str, Any] | None,
     timeout: float,
+    allow_remote: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     base = host.removesuffix("/v1")
     msgs: list[dict[str, Any]] = []
@@ -273,21 +285,22 @@ def call_ollama_native_chat(
     elif want_json:
         payload["format"] = "json"
 
-    resp = httpx.post(f"{base}/api/chat", json=payload, timeout=timeout)
-    if resp.status_code == 404:
-        raise RuntimeError(
-            f"--num-ctx requires Ollama's native /api/chat endpoint (got 404 from {base}/api/chat). Configure context size on the server instead."
-        )
-    if resp.status_code in (400, 422, 501) and want_json and "format" in payload:
-        payload.pop("format", None)
-        json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
-        if schema_obj is not None:
-            json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
-        fallback_sys = f"{system}\n\n{json_rule}" if system else json_rule
-        payload["messages"] = [{"role": "system", "content": fallback_sys}, user_msg]
-        resp = httpx.post(f"{base}/api/chat", json=payload, timeout=timeout)
-    resp.raise_for_status()
-    data = resp.json()
+    with make_http_client(timeout=timeout, allow_remote=allow_remote) as http:
+        resp = http.post(f"{base}/api/chat", json=payload)
+        if resp.status_code == 404:
+            raise RuntimeError(
+                f"--num-ctx requires Ollama's native /api/chat endpoint (got 404 from {base}/api/chat). Configure context size on the server instead."
+            )
+        if resp.status_code in (400, 422, 501) and want_json and "format" in payload:
+            payload.pop("format", None)
+            json_rule = "Respond with ONLY valid raw JSON (no markdown code fences, no commentary)."
+            if schema_obj is not None:
+                json_rule += f" Output must conform strictly to this JSON Schema:\n{json.dumps(schema_obj)}"
+            fallback_sys = f"{system}\n\n{json_rule}" if system else json_rule
+            payload["messages"] = [{"role": "system", "content": fallback_sys}, user_msg]
+            resp = http.post(f"{base}/api/chat", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
     content = str((data.get("message") or {}).get("content") or "")
     return content, data
 
@@ -322,10 +335,15 @@ def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
     host = normalize_host(args.host)
 
+    allow_remote = bool(args.allow_remote)
+    try:
+        ensure_host_allowed(host, allow_remote=allow_remote)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
     if args.check:
-        if not is_loopback_host(host):
-            print(f"WARN: {host} is a non-loopback endpoint (pass --allow-remote to send inputs there).", file=sys.stderr)
-        return run_check(host)
+        return run_check(host, allow_remote=allow_remote)
 
     dash_stdin = args.prompt == ["-"]
     prompt_parts = [] if dash_stdin else args.prompt
@@ -343,8 +361,7 @@ def main(argv: list[str]) -> int:
     want_json = bool(args.json or args.schema)
 
     try:
-        ensure_host_allowed(host, allow_remote=bool(args.allow_remote or args.allow_cloud))
-        client = make_client(host, timeout=args.timeout)
+        client = make_client(host, timeout=args.timeout, allow_remote=allow_remote)
         model = resolve_model(client, args.model, allow_cloud=args.allow_cloud)
         images = [read_image_b64(p) for p in args.image]
         schema_obj = load_schema(args.schema) if args.schema else None
@@ -362,6 +379,7 @@ def main(argv: list[str]) -> int:
                 want_json=want_json,
                 schema_obj=schema_obj,
                 timeout=args.timeout,
+                allow_remote=allow_remote,
             )
             if args.raw:
                 print(json.dumps(raw_payload, indent=2, ensure_ascii=False, allow_nan=False))

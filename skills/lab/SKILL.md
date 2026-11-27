@@ -14,11 +14,14 @@ Falsification-driven loop for uncharted problems, hard bugs, and performance or 
 
 ## 1. Question card & budget
 
-If an `ambition` Reframed Brief or `grill-me` summary already exists in this thread, inherit its goal, constraints, and out-of-scope guardrails. Before fanning out or spending compute, state in ≤8 lines:
+If an `ambition` Reframed Brief or confirmed decisions from a finished `grill-me` session exist in this thread, inherit their goal, constraints, and out-of-scope guardrails — map rawest inputs and instruments onto Gate 0, and map any outside judge onto Signal (or Step 6 holdout if it is a holdout). Before fanning out or spending compute, state in ≤8 lines:
 - **Decision**: what choice or fix this informs.
 - **Signal**: the exact metric or red/green symptom and acceptance threshold.
 - **Control**: base commit SHA and baseline measurement.
-- **Write scope**: `experiment + promote` (local commits + clean target-branch implementation) or `benchmark / read-only` (report verified findings only). Native Plan mode or explicit read-only scope always overrides: allow read-only recon/profiling only, and gate fixture writes and experiments on user approval.
+- **Write scope**: choose one before Gate 0:
+  - `read-only` (required in Plan mode or explicit read-only asks): stop after read-only recon/profiling and propose the harness + experiment plan for approval — do not create branches, commit fixtures, or edit files.
+  - `benchmark-only`: run Gate 0 + isolated experiments, then stop with verified findings and clean up scratch worktrees (skip Step 6 promotion).
+  - `experiment + promote`: run full loop through Step 6 clean promotion.
 - **Budget**: defaults are max **3 concurrent delegates**, max **2–3 rounds** (**8 rounds** in Deep mode), and **zero paid compute** (get explicit approval before paid GPU/cloud spend).
 
 ## 2. Gate 0 — Harness & noise floor first

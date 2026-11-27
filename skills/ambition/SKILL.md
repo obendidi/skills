@@ -1,6 +1,6 @@
 ---
 name: ambition
-description: Anchored pre-flight reframing to sharpen a brief before building or researching, using Altitude, Depth, and Range without scope creep. Use when the user says "ambition", "more ambitious", "ambition check", "reframe this brief", "push further", "deepen this brief", or "goal beyond the goal", or wants to check whether a task or research goal is aimed too low before running feature, lab, or deep lab.
+description: Anchored pre-flight reframing to sharpen a brief before building or researching, using Altitude, Depth, and Range without scope creep. Use when the user says "ambition", "more ambitious", "ambition check", "reframe this brief", "push this brief further", "deepen this brief", or "goal beyond the goal", or wants to check whether a task or research goal is aimed too low before running feature, lab, or deep lab.
 ---
 
 # Ambition (Anchored Reframe)

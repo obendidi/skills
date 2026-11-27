@@ -2,7 +2,7 @@
 
 Long-horizon extension of [`lab`](../SKILL.md) for open-ended optimization, algorithm/model search, and multi-round empirical investigations (`deep lab`, `autoresearch`, `research loop`, `overnight lab`).
 
-**Phase order & standalone mode**: Run `lab` Steps 1–2 on `lab/<slug>` → `deep-loop` §2–6 → `deep-loop` §7 + `lab` Step 6. On CLIs without subagents, the coordinator runs Phase 0 and isolated `git worktree` experiments serially and discloses the loss of independent cross-provider review.
+**Phase order & standalone mode**: Run `lab` Step 1 first (if `write scope` is `read-only` / Plan mode, stop after read-only recon + Phase 0 survey and ask for approval before creating `lab/<slug>` or `$LAB_DIR`); otherwise run `lab` Step 2 on `lab/<slug>` → `deep-loop` §2–6 → `deep-loop` §7 + `lab` Step 6. On CLIs without subagents, the coordinator runs Phase 0, isolated `git worktree` experiments, and the §6 stall-breaker diagnostic pass serially (disclosing the loss of independent cross-provider review).
 
 ## 1. Coordinator Role & Non-Stop Contract
 
@@ -18,21 +18,32 @@ Long-horizon extension of [`lab`](../SKILL.md) for open-ended optimization, algo
 Uncommitted files inside a main checkout are invisible to `isolation: "worktree"` children and dirty `git status`. Store transient run state inside Git's shared common directory when writable, falling back to a deterministic path in `$TMPDIR` when sandboxes write-protect `.git/`:
 
 ```bash
-COMMON_GIT="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir 2>/dev/null || true)"
+RAW_GIT="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir 2>/dev/null || true)"
+COMMON_GIT="${RAW_GIT:+$(cd "$RAW_GIT" && pwd)}"
 REPO_KEY="$(printf '%s' "${COMMON_GIT:-$PWD}" | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-8)"
-LAB_DIR="${COMMON_GIT:+$(cd "$COMMON_GIT" && pwd)/lab/<slug>}"
-if [[ -z "$LAB_DIR" ]] || ! mkdir -p "$LAB_DIR" 2>/dev/null; then
-  LAB_DIR="${TMPDIR:-/tmp}/lab-${REPO_KEY}-<slug>"
+GIT_LAB="${COMMON_GIT:+$COMMON_GIT/lab/<slug>}"
+TMP_LAB="${TMPDIR:-/tmp}/lab-${REPO_KEY}-<slug>"
+# On resume, prefer whichever candidate already holds brief.md; verify writability with touch (mkdir -p returns 0 on existing read-only dirs).
+if [[ -n "$GIT_LAB" && -f "$GIT_LAB/brief.md" ]] && (touch "$GIT_LAB/.w" 2>/dev/null && rm -f "$GIT_LAB/.w"); then
+  LAB_DIR="$GIT_LAB"
+elif [[ -f "$TMP_LAB/brief.md" ]]; then
+  LAB_DIR="$TMP_LAB"
+elif [[ -n "$GIT_LAB" ]] && mkdir -p "$GIT_LAB" 2>/dev/null && (touch "$GIT_LAB/.w" 2>/dev/null && rm -f "$GIT_LAB/.w"); then
+  LAB_DIR="$GIT_LAB"
+else
+  LAB_DIR="$TMP_LAB"
   mkdir -p "$LAB_DIR"
 fi
 ```
+
+Print the resolved absolute `LAB_DIR` in the coordinator thread so any resumed run can locate it unambiguously.
 
 **Coordinator-only writes** (read-only sandboxes cannot write files, and parallel workers race on appends — delegates return text; only the coordinator writes `$LAB_DIR`):
 - `brief.md`: decision, write scope, target metric & direction (or `open` + comparable `reference_ceiling` + optional `theoretical_floor`), control SHA, baseline `±δ`, `EVAL_SHA`, guardrails (runtime/memory/test suite), round cap, and `cooled_down_providers` (`<provider>@round`).
 - `eval.sh`: executable script (`chmod +x`) that runs against `$PWD` (never `$(dirname "$0")`), prints `METRIC=<number>` plus guardrail status, and exits non-zero on broken tests/invariants. Record `EVAL_SHA="$((sha256sum "$LAB_DIR/eval.sh" 2>/dev/null || shasum -a 256 "$LAB_DIR/eval.sh") | awk '{print $1}')"` and assert `[[ ${#EVAL_SHA} -eq 64 ]]` before Round 1.
 - `literature.md`: synthesized prior art, citations, codebase bottlenecks, and dead ends.
 - `ledger.tsv`: append-only log (`round`, `seat`, `hypothesis`, `applied_sha`, `diff_stat`, `metric`, `delta_vs_best`, `verdict`, `lesson`) where `applied_sha` is the **actual commit SHA on `lab/<slug>`** for `KEEP` rows (or candidate SHA/`NONE` for `DISCARD`).
-- **Mid-run resume**: If `$LAB_DIR/brief.md` and `$LAB_DIR/ledger.tsv` already exist (e.g. after switching the parent thread's provider/model on a quota hit), compare `lab/<slug>` `HEAD` against the last `KEEP` `applied_sha` in `ledger.tsv` (if `HEAD` is ahead due to an interrupted write, verify it with `eval.sh` and append the missing `KEEP` row before continuing; otherwise check out the last `KEEP` SHA or control SHA), read `literature.md`, and resume at the next unfinished round without repeating Gate 0 or Phase 0.
+- **Mid-run resume**: If `$LAB_DIR/brief.md` and `$LAB_DIR/ledger.tsv` already exist (e.g. after switching the parent thread's provider/model on a quota hit), verify `EVAL_SHA` first, ensure named branch `lab/<slug>` is checked out (never detached `HEAD`), and compare `lab/<slug>` tip against the last `KEEP` `applied_sha` in `ledger.tsv`. If `lab/<slug>` is ahead due to an interrupted write, verify it with `eval.sh` + acceptance rules and append the missing `KEEP` row before continuing; otherwise reset the named branch to the last verified `KEEP` SHA or control SHA (`git checkout -B lab/<slug> <sha>`), read `literature.md`, and resume at the next unfinished round without repeating Gate 0 or Phase 0.
 
 ## 3. Seats, Effort Pacing & Quota Failover
 
@@ -67,7 +78,7 @@ Synthesize replies into `$LAB_DIR/literature.md`, record `theoretical_floor` (am
 
 ## 5. Phase 1..N — Evolutionary Worktree Loop (`lab/<slug>`)
 
-Require `git status --porcelain` to be empty before creating/switching to working branch `lab/<slug>` from the control SHA (or run the coordinator in its own dedicated worktree so user WIP is never touched).
+Require `git status --porcelain` to be empty and ensure you are on a clean `lab/<slug>` branch at the control SHA (creating it from control if not already on it from Gate 0, or running the coordinator in its own dedicated worktree so user WIP is never touched).
 - **Frontier rule**: `isolation: "worktree"` branches from the coordinator's **current committed `HEAD`**. Whenever a verified candidate wins, advance `lab/<slug>` *before* launching Round `k+1` so new worktrees evolve from the new best state.
 
 Each round, launch **2–3 parallel worktree delegates** on **distinct hypotheses** (avoid spending a whole round on knob tweaks while structural baseline assumptions remain untested):
@@ -87,8 +98,8 @@ LESSON: <what caused the delta or why it failed>
 
 **Coordinator verification & selection each round**:
 1. Re-compute `CURRENT_SHA="$((sha256sum "$LAB_DIR/eval.sh" 2>/dev/null || shasum -a 256 "$LAB_DIR/eval.sh") | awk '{print $1}')"` and assert `[[ ${#CURRENT_SHA} -eq 64 && "$CURRENT_SHA" == "$EVAL_SHA" ]]`.
-2. Test viable candidates **in ranked order** inside a disposable detached worktree (`VERIFY_WT="$(mktemp -d)" && git worktree add --detach "$VERIFY_WT" <commit>`, or `git worktree add --detach "$VERIFY_WT" <frontier_sha>` + apply `git -C <worktree_path> diff` for uncommitted `WORKTREE:<path>` winners): inspect `git -C "$VERIFY_WT" diff --stat <frontier_sha>` (auto-`DISCARD` any test, fixture, tolerance, or harness edit) and **re-run `"$LAB_DIR/eval.sh"` from `"$VERIFY_WT"` yourself** until one qualifies or all fail; remove `"$VERIFY_WT"` (`git worktree remove --force "$VERIFY_WT"`).
-3. **Selection (`KEEP` vs `DISCARD`)**: `KEEP` only if all guardrails pass and the metric beats the current frontier **beyond `±δ`** — or matches within `±δ` while **deleting net code**. Advance `lab/<slug>` **only after** a candidate qualifies (`git merge --ff-only <commit>`, `git cherry-pick <commit>`, or apply + `git commit` for an uncommitted `WORKTREE:<path>` winner; never `git reset --hard` on a shared checkout) and capture `APPLIED_SHA="$(git rev-parse HEAD)"`.
+2. Test viable candidates **in ranked order** inside a disposable detached worktree (`VERIFY_WT="$(mktemp -d)" && git worktree add --detach "$VERIFY_WT" <commit>`). For an uncommitted `WORKTREE:<path>` winner, capture the complete patch including staged and new untracked files (`PATCH="$LAB_DIR/cand.patch"; git -C <wt> add -A -N . && git -C <wt> diff --binary HEAD > "$PATCH"`), apply `"$PATCH"` onto `VERIFY_WT` checked out at `<frontier_sha>`, and inspect both `git -C "$VERIFY_WT" diff --stat <frontier_sha>` and `git -C "$VERIFY_WT" status --short` (auto-`DISCARD` any test, fixture, tolerance, or harness edit). **Re-run `"$LAB_DIR/eval.sh"` from `"$VERIFY_WT"` yourself** until one qualifies or all fail; remove `"$VERIFY_WT"` (`git worktree remove --force "$VERIFY_WT"`).
+3. **Selection (`KEEP` vs `DISCARD`)**: `KEEP` only if all guardrails pass and the metric beats the current frontier **beyond `±δ`** — or matches within `±δ` while **deleting net code**. Advance `lab/<slug>` **only after** a candidate qualifies (`git merge --ff-only <commit>`, `git cherry-pick <commit>`, or apply the exact reviewed `"$PATCH"` + `git add -A && git commit` for an uncommitted `WORKTREE:<path>` winner; never `git reset --hard` on a shared checkout) and capture `APPLIED_SHA="$(git rev-parse HEAD)"`.
 4. Immediately append all candidates (recording `APPLIED_SHA` for `KEEP` rows and `LESSON` for every row) to `$LAB_DIR/ledger.tsv` before starting the next round, and cancel stalled tasks (`task_cancel` in T3 Code).
 
 ## 6. Diminishing Returns, Stall-Breaker & Open-Ended Early Exit

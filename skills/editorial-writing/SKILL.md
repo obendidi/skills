@@ -54,6 +54,6 @@ Read the title, opening paragraph, and every section lead aloud. If a capable en
 
 ## Final Check Before Publishing
 
-1. **Humanizer pass**: run the `humanizer` skill (if installed) over the finished prose to strip AI tells (em-dash piles, not-X-but-Y staging, bold-colon lists, stock AI words, one-line closers) while preserving the writer's voice if a sample was provided.
+1. **Humanizer pass**: run the `humanizer` skill (if installed) over the finished prose to strip AI tells (dashes kept only at the writer's sample rate, not-X-but-Y staging, bold-colon lists, stock AI words, one-line closers) while preserving the writer's voice if a sample was provided.
 2. **README offload check**: scan every table, code block, and bullet list. If a detail is reference material rather than part of the story, replace it with one plain sentence and a link to the README or docs.
 3. **Truth and link check**: verify every rounded narrative claim matches the exact chart/source data, and verify every linked doc and embedded image URL resolves.

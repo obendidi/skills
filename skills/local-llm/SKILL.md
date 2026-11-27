@@ -24,7 +24,7 @@ Resolve `LOCAL_LLM="<skill-dir>/scripts/local-llm"` from this `SKILL.md`'s direc
 "$LOCAL_LLM" --check
 ```
 
-Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first local non-embedding chat model (`*embed*` and `*-cloud` tags are skipped automatically, and non-loopback `OLLAMA_HOST` / `--host` endpoints are refused by default unless `--allow-remote` or `--allow-cloud` is passed so private files never leave localhost silently). Requires `uv` and localhost access — inside restricted sandboxes (e.g. Codex, Cursor), retry with network/escalated permission before declaring Ollama unavailable.
+Exits `0` with installed and currently loaded models when reachable at `http://127.0.0.1:11434`, or exits `2` if unavailable. Defaults to `$LOCAL_LLM_MODEL`, or the first local non-embedding chat model (`*embed*` and `*-cloud` tags are skipped unless `--allow-cloud` is passed, and non-loopback `OLLAMA_HOST` / `--host` endpoints are refused — even on `--check` — with environment proxies and redirects disabled unless `--allow-remote` is passed so private files never leave localhost silently). Requires `uv` and localhost access — inside restricted sandboxes (e.g. Codex, Cursor), retry with network/escalated permission before declaring Ollama unavailable.
 
 ## Common Usage
 
