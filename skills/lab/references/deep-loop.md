@@ -64,17 +64,17 @@ Before editing code, launch up to **3 parallel read-only delegates** on disjoint
 ```text
 Research only. Do not edit files, commit, or start subagents.
 Repo: <abs path> | Angle: <A, B, or C> | Brief: <LAB_DIR>/brief.md
-Find concrete, falsifiable mechanisms that move METRIC without breaking guardrails. Separate hard invariants from accidental baseline assumptions. Cite URLs (external) or file:line + profiler numbers (local). Flag dead ends.
+Find concrete, falsifiable mechanisms that move METRIC without breaking guardrails. Separate hard invariants from accidental baseline assumptions. Verify external claims against primary papers, docs, or code rather than search snippets, quoting exact numbers alongside URLs (external) or file:line + profiler numbers (local). Cap external tracks at 8-12 web searches/tool steps; if you hit the cap, return partial verified findings plus remaining gaps instead of looping. Flag dead ends.
 Reply in <=28 lines:
-FINDINGS: 3-5 bullets with citations/measurements
+FINDINGS: 3-5 bullets with primary citations/measurements
 ASSUMPTIONS: <hard invariants vs. accidental baseline assumptions that may cap METRIC>
 THEORETICAL_FLOOR: <physical/hardware/information-theoretic bound if measurable>
 REFERENCE_CEILING: <comparable SOTA or oracle on matching workload/constraints, or unknown>
 HYPOTHESES: 2-3 ranked `If X, changing Y produces Z` proposals with expected gain and risk
-DEAD_ENDS: approaches to skip and why
+DEAD_ENDS_AND_GAPS: approaches to skip and any unverified gaps
 ```
 
-Synthesize replies into `$LAB_DIR/literature.md`, record `theoretical_floor` (ambition anchor) and comparable `reference_ceiling` (stopping target, or `unknown`) in `brief.md`, and rank 5–8 falsifiable hypotheses mixing structural bets with incremental wins.
+Read replies as they arrive; if 2 angles finish and the 3rd stalls, cancel the straggler (`task_cancel` in T3 Code) and proceed. Synthesize replies into `$LAB_DIR/literature.md`, record `theoretical_floor` (ambition anchor) and comparable `reference_ceiling` (stopping target, or `unknown`) in `brief.md`, and rank 5–8 falsifiable hypotheses mixing structural bets with incremental wins.
 
 ## 5. Phase 1..N — Evolutionary Worktree Loop (`lab/<slug>`)
 
