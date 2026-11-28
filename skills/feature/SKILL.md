@@ -37,6 +37,7 @@ Stop and wait for explicit user approval (or native Plan mode approval) before e
 ## 5. Build & verify
 
 - Implement slice by slice, running each slice's verification command before moving on.
+- **Closed-loop refactors**: when replacing an implementation or standardizing a boundary, migrate verified callers and delete the old path in the same slice when safe (or explicitly track the remaining dual-write cutover); lock settled module boundaries with existing linter, typecheck, or import rules instead of prose comments.
 - **Drift stop**: if implementation uncovers an unplanned contract change, migration, or wide blast radius, stop and re-plan. After 2 re-plans, pause for the user.
 
 ## 6. Review & ship
