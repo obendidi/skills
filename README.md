@@ -7,7 +7,7 @@ A lightweight operating loop (`ambition` pre-flight, 3-tier execution `quick` / 
 
 ## Why this
 
-Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). Every workflow `SKILL.md` stays under 75 lines, built around two ideas:
+Most agent skill packs skew either toward heavy end-to-end process on every edit (e.g., [`obra/superpowers`](https://github.com/obra/superpowers)) or PR/CI automation alone (e.g., [`t3dotgg/tstack`](https://github.com/t3dotgg/tstack)). Each `SKILL.md` stays short and scannable (with longer deep-mode playbooks kept in on-demand `references/` files), built around two ideas:
 
 - **Match ceremony to risk**: small fixes run with zero planning overhead (`quick`), multi-file changes gate on a ≤40-line plan (`feature`), and hard bugs require a runnable harness plus isolated worktree experiments before touching `main` (`lab`). Optional `ambition` reframes a brief before locking scope.
 - **Multi-provider when available, standalone everywhere**: `lab` and `council` fan out across providers in T3 Code, and explicitly fall back to fresh read-only subagents or local `git worktree` runs in single-provider CLIs.
@@ -47,13 +47,13 @@ npx skills update
 | [`lab`](skills/lab/SKILL.md) | **Tier 3** — Empirical research / hard bug | `tier 3`, `lab`, `deep lab`, `autoresearch`, `research loop`, `overnight lab`, `spike` | Runnable harness first → isolated worktree experiments (plus multi-round literature & frontier loop in [`deep lab`](skills/lab/references/deep-loop.md)) → independent verification → clean promotion |
 | [`review`](skills/review/SKILL.md) | Single-pass code review | `review this`, `code review`, `review my PR`, `is this over-engineered` | Correctness & spec, value & adoption, high-confidence security, elegance vs. hotfix, scale/tests, and anti-bloat |
 | [`council`](skills/council/SKILL.md) | Multi-provider review / critique | `council`, `council of 2`, `fast council`, `cheap council` | Independent multi-provider review using the `review` rubric (plus `fast council`, RFC/plan critique, and split-lens single-provider fallback) |
-| [`pr`](skills/pr/SKILL.md) | Pull requests | file, open, comment on, monitor, or babysit a PR | Clean PR descriptions, agent-attributed GitHub comments, and scope-disciplined babysitting |
+| [`pr`](skills/pr/SKILL.md) | Pull requests | file, open, comment on, monitor, or babysit a PR | Clean PR descriptions, agent-attributed GitHub comments, and automatic scope-disciplined babysitting on non-draft PRs |
 
 ### Specialist skills
 
 | Skill | Domain | What it does |
 | :--- | :--- | :--- |
-| [`local-llm`](skills/local-llm/SKILL.md) | Local Ollama / OpenAI-compatible CLI | Bundled zero-setup `uv` script for private OCR/vision, bulk classification, and strict JSON extraction (loopback-locked by default; MLX HTTP-501 structured-output fallback) |
+| [`local-llm`](skills/local-llm/SKILL.md) | Local Ollama / OpenAI-compatible CLI | Bundled zero-setup `uv` script for private OCR/vision, bulk classification, and strict JSON extraction (loopback-locked by default; structured-output fallback for HTTP 400/422/501 servers with schema validation) |
 | [`ui-workbench`](skills/ui-workbench/SKILL.md) | Web UI & dashboards | Calm workbench-first design system with dual-theme semantic tokens, progressive disclosure, disciplined typography, and visual-audit gates |
 | [`plain-writing`](skills/plain-writing/SKILL.md) | Technical reference prose | Conclusion-first PRs, RFCs, READMEs, and changelogs with concrete numbers and AI-filler cuts |
 | [`editorial-writing`](skills/editorial-writing/SKILL.md) | Technical blog & launch articles | Story-first engineering posts and launch write-ups in plain language, keeping heavy reference tables in the README |
