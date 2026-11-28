@@ -37,12 +37,13 @@ Repo: <abs path> Target: <WIP | base..head SHA | PR #> Intent: <intent> Out of s
 See: <git diff HEAD + relevant untracked files for WIP, OR git diff <base>...<head> [-- <paths>] for committed branches/PRs>.
 Apply the `review` skill rubric (read callers/tests; check correctness & spec, value & adoption, high-confidence security after tracing untrusted vs server-controlled input, design elegance vs hotfix, scale/tests, and lean/anti-bloat).
 Skip style unless it hides a bug. Every finding needs a concrete case or cleaner seam.
+Tag each finding observed (logs, tickets, hit in normal use), likely, or rare (needs unusual timing or sequence); rare outside auth, security, or irreversible data loss is a nit.
 blocker = intended case wrong, exploitable security, or data loss. should = real bug, missing spec, ugly hotfix with clear better seam, risky untested code, or bloat. nit = rest.
 Reply:
 SCORE: <n>/10
 VERDICT: APPROVE or CHANGES
 SUMMARY: <1 line: clean design vs tactical hotfix + worth it?>
-C1 [blocker|should|nit] <file>:<line> <claim>. Fix: <suggestion>
+C1 [blocker|should|nit] [observed|likely|rare] <file>:<line> <claim>. Fix: <suggestion>
 ```
 
 ### Plan / RFC / design critique brief (non-code)
@@ -61,13 +62,14 @@ C1 [blocker|should|nit] <section> <claim>. Fix: <suggestion>
 
 ## Acting on Findings
 
-Verify every finding against the source yourself; re-classify rare cases or minor costs as nits. Report verified findings first; only edit when asked to fix/iterate:
+Verify every finding against the source yourself; re-classify rare cases or minor costs as nits. Report verified findings first with a recommended fix list (`observed` and `likely` only), and flag any fix that adds more code than the bug it prevents. Only edit when asked to fix/iterate:
 - **Agree**: make the smallest fix (prefer deleting or simplifying code over adding guards or wrappers).
 - **Disagree**: cite `file:line`, test, or output.
 - **Out of scope / nit**: decline in one line and list as a follow-up.
 
 ## Rounds & Report
 
-- Budget: **2 rounds** when iterating on fixes (3 only for auth, security, data loss, or concurrency with an open blocker/should). Re-reviews use a fresh reviewer/delegate with the ledger of `fixed:`, `disagree:`, and `declined:` items.
+- Budget: **2 rounds** when iterating on fixes (3 only for an open `observed` blocker). Re-reviews use a fresh reviewer/delegate with the ledger of `fixed:`, `disagree:`, and `declined:` items, and check only the ledger and regressions: new findings in code the fixes added are follow-ups unless blocker.
+- Stop and propose a simpler cut when most findings target code the last round added, or the diff has grown by half since round 1.
 - Stop early when a round returns only nits. If disputed after 2 replies or budget ends, present both sides in 2–3 lines for the user to decide.
 - Report a compact score table per round (`no score` if omitted; never invent one) plus verified findings, disagreements, and follow-ups. Add to a PR description only if asked.

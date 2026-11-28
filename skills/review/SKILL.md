@@ -28,6 +28,7 @@ Read-only review of a change from the perspective of the engineer who will own i
 - Every finding needs a **concrete failure case, verified unused/duplicated path, or concrete simpler alternative** — no vague worries or "consider X".
 - Skip style, formatting, or anything linters/typecheckers already enforce unless it hides a real bug.
 - Re-read the referenced lines to verify the caller exists, the input can really be attacker-controlled or empty, or the code is genuinely unused.
+- **Impact**: Tag each finding `observed` (logs, tickets, hit in normal use), `likely`, or `rare` (needs unusual timing or sequence). A `rare` finding outside auth, security, or irreversible data loss is a nit.
 - Propose the smallest fix that solves the cause. Prefer fixes that delete or simplify code over adding layers or guards.
 
 ## 4. Output Format
@@ -40,6 +41,6 @@ Then list findings in three groups (skip empty groups), numbered continuously ac
 - **Nit** (`nit`): small simplifications, minor speed-ups, or optional polish.
 
 For each finding, state in plain English:
-`N. **Short title** (file:line) — What breaks or why it matters. Fix: smallest concrete change (or cleaner alternative).`
+`N. **Short title** (file:line) [observed|likely|rare] — What breaks or why it matters. Fix: smallest concrete change (or cleaner alternative).`
 
 Close with one line: **Verdict** (`APPROVE` or `CHANGES`) and what went unchecked (e.g. runtime tests, live infra, missing spec).

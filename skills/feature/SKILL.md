@@ -9,7 +9,7 @@ For refactors, multi-service work, contract/schema changes, or features where ge
 
 ## 1. Recon (read-only)
 
-Read the affected modules, callers, contracts, tests, and repo conventions before asking anything. Don't ask questions the codebase already answers, and note any existing pattern that looks broken or mismatched rather than assuming it must be copied.
+Read the affected modules, callers, contracts, tests, and repo conventions before asking anything. Don't ask questions the codebase already answers, and note any existing pattern that looks broken or mismatched rather than assuming it must be copied. Find evidence the problem happens (logs, usage, tickets); if there is none, say so in the plan's Goal line.
 
 ## 2. Align (max 2 rounds)
 
